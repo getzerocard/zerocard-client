@@ -1,0 +1,154 @@
+{
+  "user": {
+    "username": "John Doe",
+    "email": "john.doe@example.com",
+    "walletAddress": "0xf235..6h92F",
+    "balance": 123.45
+  },
+  "card": {
+    "number": "**** **** **** 0987",
+    "holderName": "John Doe",
+    "expiryDate": "05/26",
+    "status": "activated"
+  },
+  "transactions": [
+    {
+      "id": "1",
+      "name": "Starbucks",
+      "icon": "☕",
+      "date": "Today",
+      "category": "Food",
+      "amount": -24.5,
+      "timestamp": "2023-08-01T09:30:00Z"
+    },
+    {
+      "id": "2",
+      "name": "Uber",
+      "icon": "🚗",
+      "date": "Yesterday",
+      "category": "Transportation",
+      "amount": -15.75,
+      "timestamp": "2023-07-31T18:45:00Z"
+    },
+    {
+      "id": "3",
+      "name": "Salary Deposit",
+      "icon": "💰",
+      "date": "Jun 25",
+      "category": "Income",
+      "amount": 2750.0,
+      "timestamp": "2023-07-25T10:00:00Z"
+    },
+    {
+      "id": "4",
+      "name": "Amazon",
+      "icon": "🛒",
+      "date": "Jun 23",
+      "category": "Shopping",
+      "amount": -67.99,
+      "timestamp": "2023-07-23T14:20:00Z"
+    },
+    {
+      "id": "5",
+      "name": "Netflix",
+      "icon": "🎬",
+      "date": "Jun 20",
+      "category": "Entertainment",
+      "amount": -14.99,
+      "timestamp": "2023-07-20T00:00:00Z"
+    },
+    {
+      "id": "6",
+      "name": "Gym Membership",
+      "icon": "💪",
+      "date": "Jun 15",
+      "category": "Health",
+      "amount": -49.99,
+      "timestamp": "2023-07-15T00:00:00Z"
+    },
+    {
+      "id": "7",
+      "name": "Friend Transfer",
+      "icon": "👥",
+      "date": "Jun 12",
+      "category": "Transfer",
+      "amount": 35.0,
+      "timestamp": "2023-07-12T15:30:00Z"
+    }
+  ],
+  "userStages": {
+    "new_user": {
+      "cardNumber": "No card found",
+      "expiryDate": "··/··",
+      "walletAddress": "········"
+    },
+    "ordered_card": {
+      "cardNumber": "No card found",
+      "expiryDate": "··/··",
+      "walletAddress": "········",
+      "estimatedDelivery": "7-10 business days"
+    },
+    "activated_card": {
+      "cardNumber": "**** **** **** 0987",
+      "expiryDate": "05/26",
+      "walletAddress": "0xf235..6h92F"
+    },
+    "has_transactions": {
+      "cardNumber": "**** **** **** 0987",
+      "expiryDate": "05/26",
+      "walletAddress": "0xf235..6h92F"
+    }
+  },
+  "contacts": [
+    {
+      "id": "1",
+      "name": "Sarah Johnson",
+      "username": "@sarahj",
+      "avatar": "👩‍💼"
+    },
+    {
+      "id": "2",
+      "name": "Mike Chen",
+      "username": "@mikechen",
+      "avatar": "👨‍💻"
+    },
+    {
+      "id": "3",
+      "name": "Alex Rodriguez",
+      "username": "@alexr",
+      "avatar": "🧑‍🎨"
+    },
+    {
+      "id": "4",
+      "name": "Emily Wilson",
+      "username": "@emilyw",
+      "avatar": "👩‍🔬"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "1",
+      "title": "Card activated",
+      "message": "Your card has been successfully activated and is ready to use.",
+      "date": "Today",
+      "read": false,
+      "type": "card"
+    },
+    {
+      "id": "2",
+      "title": "Funds received",
+      "message": "You've received $2,750.00 from Direct Deposit.",
+      "date": "Jun 25",
+      "read": true,
+      "type": "transaction"
+    },
+    {
+      "id": "3",
+      "title": "Card shipped",
+      "message": "Your card has been shipped and will arrive in 3-5 business days.",
+      "date": "Jun 20",
+      "read": true,
+      "type": "card"
+    }
+  ]
+}

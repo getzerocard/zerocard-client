@@ -1,0 +1,84 @@
+{
+  "expo": {
+    "name": "zerocard",
+    "slug": "zerocard",
+    "version": "1.0.0",
+    "scheme": "zerocard",
+    "owner": "folajindayo",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/your-project-id",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "compileSdkVersion": 34
+          }
+        }
+      ],
+      "expo-barcode-scanner"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "orientation": "portrait",
+    "icon": "./assets/base-logo-in-blue.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f7f7f7"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "newArchEnabled": true,
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.zerocard.zerocard"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/base-logo-in-blue.png",
+        "backgroundColor": "#ffffff"
+      },
+      "newArchEnabled": true,
+      "package": "com.zerocard.zerocard",
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "95e69556-dbf1-4c9c-9e13-cc8b86076f5d"
+      }
+    }
+  }
+}
