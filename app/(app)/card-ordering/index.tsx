@@ -14,7 +14,7 @@ export default function OrderCardPage() {
 
   const handleGetStarted = () => {
     // Use absolute path instead of relative path for more reliable navigation
-    router.push('/(app)/card-ordering/identity-verification');
+    router.push('/(app)/card-ordering/shipping-address');
   };
 
   return (

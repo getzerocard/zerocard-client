@@ -13,7 +13,6 @@ import { SvgXml } from 'react-native-svg';
 import { useFonts } from 'expo-font';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import SubmissionSummary from '../features/kyc/SubmissionSummary';
 import { create } from 'zustand';
 
 // Import close icon SVG
@@ -143,7 +142,6 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
   const [state, setState] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [showStateDropdown, setShowStateDropdown] = useState(false);
-  const [showSubmissionSummary, setShowSubmissionSummary] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const { suggestions, selectedAddress, setSuggestions, setSelectedAddress, clearSuggestions } = useAddressStore();
@@ -229,9 +227,6 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
   const handleContinue = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Show Submission Summary
-    setShowSubmissionSummary(true);
-
     // Call the onContinue prop if provided
     if (onContinue) {
       const addressData: AddressData = {
@@ -246,11 +241,6 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
 
       onContinue(addressData);
     }
-  };
-
-  // Handler for returning from SubmissionSummary to ShippingAddress
-  const handleBackFromSubmissionSummary = () => {
-    setShowSubmissionSummary(false);
   };
 
   // Save the current form state as a draft
@@ -278,29 +268,6 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     postalCodeRef.current?.focus();
   };
-
-  // If showSubmissionSummary is true, render SubmissionSummary instead of ShippingAddress
-  if (showSubmissionSummary) {
-    const userData = {
-      ...userInfo,
-      street,
-      city,
-      state,
-      postalCode,
-    };
-
-    return (
-      <SubmissionSummary
-        onClose={onClose}
-        onEdit={handleBackFromSubmissionSummary}
-        onContinue={() => {
-          // Final submission logic would go here
-          onClose(); // For now, just close the form flow
-        }}
-        userData={userData}
-      />
-    );
-  }
 
   return (
     <KeyboardAvoidingView

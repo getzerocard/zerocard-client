@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { LoadingSpinner } from '../ui/feedback/LoadingSpinner';
 import { router } from 'expo-router';
-import OrderConfirmation from '../features/card/OrderConfirmation';
+import { OtpInfoDialog } from '../ui/info/OtpInfoDialog';
 
 // Import close icon SVG
 const closeIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -414,10 +414,19 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
               <Text style={styles.errorText}>Invalid OTP code</Text>
             </TouchableOpacity>
           ) : identityVerified && !otpVerified ? (
-            <View style={styles.infoContainer}>
-              <SvgXml xml={smallTickCircleIconSvg} width={14} height={14} />
-              <Text style={styles.infoText}>Code sent to {formatPhoneNumber(identityNumber)}</Text>
-            </View>
+            <>
+              <View style={styles.infoContainer}>
+                <SvgXml xml={smallTickCircleIconSvg} width={14} height={14} />
+                <Text style={styles.infoText}>Code sent to {formatPhoneNumber(identityNumber)}</Text>
+              </View>
+              
+              {/* OTP Info Dialog for NIN - Moved below the "Code sent to..." message */}
+              {selectedIdentity === 'National Identity Number (NIN)' && (
+                <View style={{ marginTop: 16, width: '100%' }}>
+                  <OtpInfoDialog />
+                </View>
+              )}
+            </>
           ) : otpVerified ? (
             <View style={styles.infoContainer}>
               <Text style={styles.nameText}>{userName}</Text>
@@ -493,7 +502,7 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
                   color="#000000"
                   style={styles.buttonIcon}
                 />
-                <Text style={styles.buttonText}>Verify identity</Text>
+                <Text style={styles.buttonText}>Create card</Text>
               </>
             )}
           </TouchableOpacity>

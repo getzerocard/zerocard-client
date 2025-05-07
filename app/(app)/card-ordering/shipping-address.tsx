@@ -18,7 +18,7 @@ export default function ShippingAddressScreen() {
 
   const handleContinue = (addressData: any) => {
     // Use absolute path instead of relative path for more reliable navigation
-    router.push('/(app)/card-ordering/order-confirmation');
+    router.push('/(app)/card-ordering/identity-verification');
   };
 
   return (

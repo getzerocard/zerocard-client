@@ -15,7 +15,7 @@ export default function IdentityVerificationScreen() {
   const handleVerify = (idType: string, idNumber: string) => {
     // Use absolute path instead of relative path for more reliable navigation
     console.log('Identity verified:', idType, idNumber);
-    router.push('/(app)/card-ordering/shipping-address');
+    router.push('/(app)/card-ordering/order-confirmation');
   };
 
   return (

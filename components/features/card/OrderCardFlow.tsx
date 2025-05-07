@@ -146,12 +146,12 @@ const OrderCardFlow: React.FC<OrderCardFlowProps> = ({ onClose, onGetStarted }) 
 
             <View style={styles.requirementItem}>
                 <View style={styles.requirementDot} />
-                <Text style={styles.requirementText}>Identity Verification</Text>
+                <Text style={styles.requirementText}>Shipping address</Text>
             </View>
 
             <View style={styles.requirementItem}>
                 <View style={styles.requirementDot} />
-                <Text style={styles.requirementText}>Shipping address</Text>
+                <Text style={styles.requirementText}>Identity Verification</Text>
             </View>
           </View>
         </SquircleView>

@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ImageSourcePropType } from 'react-native';
+import { router } from 'expo-router';
 
 import { useUserWalletAddress } from '../../../hooks/useUserWalletAddress';
-import Web3Avatar from '../../ui/Avatar';
+import { Web3Avatar } from '../../ui/Avatar';
 
 interface GreetingHeaderProps {
   username: string;
@@ -28,6 +29,15 @@ export default function GreetingHeader({
     return 'Good evening';
   };
 
+  // Handle profile navigation
+  const handleProfilePress = () => {
+    if (onProfilePress) {
+      onProfilePress();
+    } else {
+      router.push('/profile');
+    }
+  };
+
   // Fallback address in case wallet isn't loaded yet
   const fallbackAddress = '0x0000000000000000000000000000000000000000';
 
@@ -35,8 +45,8 @@ export default function GreetingHeader({
     <View style={styles.container}>
       <TouchableOpacity
         style={styles.profileContainer}
-        onPress={onProfilePress}
-        disabled={!onProfilePress}>
+        onPress={handleProfilePress}
+        activeOpacity={0.7}>
         {/* Use real wallet address or fallback if not available */}
         <Web3Avatar address={walletAddress || fallbackAddress} size={48} />
       </TouchableOpacity>

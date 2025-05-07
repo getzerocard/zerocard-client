@@ -34,7 +34,7 @@ export function usePrivyDelegation(): UsePrivyDelegationReturn {
       return;
     }
 
-    const wallets: EmbeddedWallet[] = getAllUserEmbeddedEthereumWallets(currentUser) as EmbeddedWallet[];
+    const wallets: EmbeddedWallet[] = getAllUserEmbeddedEthereumWallets(currentUser as any) as EmbeddedWallet[];
     
     if (!wallets || wallets.length === 0) {
       console.log('No embedded Ethereum wallets found for the user.');
