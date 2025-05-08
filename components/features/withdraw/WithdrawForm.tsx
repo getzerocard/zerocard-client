@@ -14,9 +14,9 @@ import { router } from 'expo-router';
 import { SquircleView } from 'react-native-figma-squircle';
 import * as Haptics from 'expo-haptics';
 import { Button } from '../../ui/Button';
-import { useBasenameResolver } from '../../../hooks/useBasenameResolver';
+import { useBasenameResolver } from '../../../common/hooks/useBasenameResolver';
 import * as Clipboard from 'expo-clipboard';
-import { isValidAddress, isBasenameWithSuffix } from '../../../utils/basenameResolver';
+import { isValidAddress, isBasenameWithSuffix } from '../../../common/utils/basenameResolver';
 
 // Import SVG icons as strings
 const usdcIconSvg = `<svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -54,7 +54,6 @@ export default function TabLayout() {
           screenOptions={{
             headerShown: false,
             tabBarStyle: { display: 'none' }, // Hide the default tab bar
-            contentStyle: { backgroundColor: '#f7f7f7', paddingHorizontal: 16 },
           }}
           // Use our custom NavigationBar only if not hiding
           tabBar={hideTabBar ? () => null : () => <NavigationBar />}>
@@ -62,26 +61,22 @@ export default function TabLayout() {
             name="home"
             options={{
               title: 'Home',
-              // This makes home/index.tsx the default for the "home" route
-              href: {
-                pathname: 'home/index',
-              },
             }}
           />
           <Tabs.Screen
-            name="card/index"
+            name="card"
             options={{
               title: 'Card',
             }}
           />
           <Tabs.Screen
-            name="load-wallet/index"
+            name="load-wallet"
             options={{
               title: 'Load Wallet',
             }}
           />
           <Tabs.Screen
-            name="profile/index"
+            name="profile"
             options={{
               title: 'Profile',
             }}

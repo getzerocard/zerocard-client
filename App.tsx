@@ -1,8 +1,8 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { DepositModalProvider } from './hooks/useDepositModal';
-import { UsernameModalProvider } from './hooks/useUsernameModal';
+import { DepositModalProvider } from './common/hooks/useDepositModal';
+import { UsernameModalProvider } from './common/hooks/useUsernameModal';
 
 // Import the Expo Router entry point
 import { RootSiblingParent } from 'react-native-root-siblings';

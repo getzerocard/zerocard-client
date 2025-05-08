@@ -3,7 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from 'react-na
 import * as ImagePicker from 'expo-image-picker';
 import { SvgXml } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
-import { useUserWalletAddress } from '../../../hooks/useUserWalletAddress';
+import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
 import { SkeletonLoader } from '../../ui/feedback/SkeletonLoader';
 import Web3Avatar from '../../ui/Avatar/Web3Avatar';
 

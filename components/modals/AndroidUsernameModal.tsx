@@ -22,7 +22,7 @@ import { Button } from '../ui/Button';
 import * as Haptics from 'expo-haptics';
 import { LoadingSpinner } from '../ui/feedback/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
-import { useUsernameModal } from '../../hooks/useUsernameModal';
+import { useUsernameModal } from '../../common/hooks/useUsernameModal';
 
 type ValidationStatus = 'idle' | 'checking' | 'error' | 'success';
 

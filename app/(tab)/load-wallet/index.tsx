@@ -26,7 +26,7 @@ import * as FileSystem from 'expo-file-system';
 import QRCode from 'react-native-qrcode-svg';
 import * as ScreenCapture from 'expo-screen-capture';
 import * as MediaLibrary from 'expo-media-library';
-import { useUserWalletAddress } from '../../../hooks/useUserWalletAddress';
+import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
 
 // Disable yellow box warnings for dev
 LogBox.ignoreLogs(['ViewShot']);

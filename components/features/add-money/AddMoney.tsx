@@ -22,7 +22,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { SvgXml } from 'react-native-svg';
 
 import { SkeletonLoader } from '../../ui/feedback';
-import { useUserWalletAddress } from '../../../hooks';
+import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
 
 // Import SVG files as strings
 const usdcSvg = `<svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">

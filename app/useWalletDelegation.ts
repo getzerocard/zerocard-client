@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useHeadlessDelegatedActions } from '@privy-io/expo';
-import { useUserWalletAddress } from '../hooks/useUserWalletAddress';
+import { useUserWalletAddress } from '../common/hooks/useUserWalletAddress';
 
 interface User {
   wallet?: {

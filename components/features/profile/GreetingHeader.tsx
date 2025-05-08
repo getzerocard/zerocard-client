@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ImageSourcePropType } from 'react-native';
 import { router } from 'expo-router';
 
-import { useUserWalletAddress } from '../../../hooks/useUserWalletAddress';
+import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
 import { Web3Avatar } from '../../ui/Avatar';
 
 interface GreetingHeaderProps {

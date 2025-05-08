@@ -6,7 +6,7 @@ import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import * as NavigationBarExpo from 'expo-navigation-bar';
 import Web3Avatar from '../ui/Avatar/Web3Avatar';
-import { useUserWalletAddress } from '../../hooks/useUserWalletAddress';
+import { useUserWalletAddress } from '../../common/hooks/useUserWalletAddress';
 
 interface NavigationBarProps {
   onHomePress?: () => void;

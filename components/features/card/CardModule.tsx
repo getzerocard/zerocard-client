@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Alert, Clipboard, ViewStyle } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { useUserWalletAddress } from '../../../hooks/useUserWalletAddress';
+import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
 import { SkeletonLoader } from '../../ui/feedback/SkeletonLoader';
 
 // Import SVG assets as strings

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ImageSourcePropType } from 'react-native';
 import { Web3Avatar } from '../ui/Avatar';
-import { useUserWalletAddress } from '../../hooks';
+import { useUserWalletAddress } from '../../common/hooks/useUserWalletAddress';
 
 interface GreetingHeaderProps {
   username: string;
