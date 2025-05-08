@@ -2,7 +2,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator } fr
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SvgXml } from 'react-native-svg';
-import { usePrivy, useLogin, useHeadlessDelegatedActions } from '@privy-io/expo';
+import { usePrivy, useLogin, useHeadlessDelegatedActions, useIdentityToken } from '@privy-io/expo';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import useWalletDelegation from './useWalletDelegation';
@@ -27,6 +27,25 @@ export default function SplashScreen() {
   const { user } = privyContext;
   const ready = privyContext.isReady === true;
   const { login } = useLogin();
+  const { getIdentityToken } = useIdentityToken();
+
+  // Once Privy is ready and a user is present, fetch and log the raw identity token
+  useEffect(() => {
+    if (ready && user) {
+      console.log('[SplashScreen] → Privy ready, user detected. Fetching identity token…');
+      getIdentityToken()
+        .then((token) => {
+          if (token) {
+            console.log('[SplashScreen] ✅ Identity Token:', token);
+          } else {
+            console.warn('[SplashScreen] ⚠️ No identity token (user not logged in?)');
+          }
+        })
+        .catch((err) => {
+          console.error('[SplashScreen] ❌ Error fetching identity token:', err);
+        });
+    }
+  }, [ready, user]);
 
   // Show loading state while Privy initializes
   if (!ready) {

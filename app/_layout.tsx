@@ -1,25 +1,89 @@
 import '../global.css';
 import { Stack } from 'expo-router';
-import { PrivyProvider, PrivyElements, usePrivy } from '@privy-io/expo';
+import {
+  PrivyProvider,
+  PrivyElements,
+  usePrivy,
+  useIdentityToken,
+} from '@privy-io/expo';
 import { useEffect } from 'react';
 import NetworkStatus from '../components/toasts/NetworkStatus';
 import { CryptoDepositProvider } from '../components/context/CryptoDepositContext';
 import { apiService } from '../api';
+import { TokenGetters } from '../common/utils/handleToken';
 
 // Initialize API configuration and set up
 function ApiInitializer() {
   const privy = usePrivy();
-  
-  useEffect(() => {
-    // Only initialize once privy is ready and not null
-    if (privy && privy.isReady) {
-      // Set the token provider only if it hasn't been set yet or if it changed
-      apiService.setTokenProvider(privy);
-      console.log('API service initialized with Privy token provider');
-    }
-  }, [privy?.isReady]); // Only re-run when privy.isReady changes, not the entire privy object
+  const { getIdentityToken } = useIdentityToken();
 
-  return null; // This component doesn't render anything
+  useEffect(() => {
+    console.log('[ApiInitializer] Effect triggered. Privy ready:', privy?.isReady, 'getIdentityToken available:', typeof getIdentityToken === 'function');
+    if (privy && privy.isReady && privy.user && typeof getIdentityToken === 'function') {
+      if (typeof privy.getAccessToken !== 'function') {
+        console.error('[ApiInitializer] privy.getAccessToken is NOT a function. Cannot configure ApiService.');
+        return;
+      }
+      console.log('[ApiInitializer] Configuring ApiService with token accessors...');
+      const tokenAccessors: TokenGetters = {
+        getAccessToken: async () => {
+          if (privy && typeof privy.getAccessToken === 'function') {
+            try {
+              console.log('[ApiInitializer] Calling privy.getAccessToken()...');
+              const token = await privy.getAccessToken();
+              console.log('[ApiInitializer] Access token from privy.getAccessToken():', token ? 'Retrieved' : 'null');
+              return token;
+            } catch (error) {
+              console.error('[ApiInitializer] Error in privy.getAccessToken() wrapper:', error);
+              return null;
+            }
+          } else {
+            console.warn('[ApiInitializer] Privy client or getAccessToken method became invalid.');
+            return null;
+          }
+        },
+        getIdentityToken: getIdentityToken,
+        getSessionToken: async () => {
+          try {
+            // In Privy, we need to find the right method for session tokens
+            // First check if privy has any session or auth token method
+            if (privy) {
+              // Use type assertion and optional chaining for safety
+              const privyAny = privy as any;
+              if (typeof privyAny?.getSessionToken === 'function') {
+                console.log('[ApiInitializer] Calling privy.getSessionToken()...');
+                return await privyAny.getSessionToken();
+              } else if (typeof privyAny?.getAuthToken === 'function') {
+                console.log('[ApiInitializer] Calling privy.getAuthToken()...');
+                return await privyAny.getAuthToken();
+              } else if (typeof privyAny?.getSession === 'function') {
+                console.log('[ApiInitializer] Calling privy.getSession()...');
+                const session = await privyAny.getSession();
+                // Return token from session if available
+                return session?.token || null;
+              }
+            }
+            
+            console.log('[ApiInitializer] No session token method available, falling back to identity token...');
+            return null;
+          } catch (error) {
+            console.error('[ApiInitializer] Error getting session token:', error);
+            return null;
+          }
+        }
+      };
+      apiService.setTokenAccessors(tokenAccessors);
+      console.log('[ApiInitializer] ApiService token accessors configured successfully.');
+    } else {
+      let logReason = '[ApiInitializer] Conditions not met for ApiService configuration:';
+      if (!privy || !privy.isReady) logReason += ' Privy not ready;';
+      if (!privy?.user) logReason += ' No Privy user;';
+      if (typeof getIdentityToken !== 'function') logReason += ' getIdentityToken not a function;';
+      console.log(logReason);
+    }
+  }, [privy, privy?.isReady, privy?.user, getIdentityToken]);
+
+  return null;
 }
 
 export default function RootLayout() {

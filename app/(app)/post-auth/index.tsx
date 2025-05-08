@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useHeadlessDelegatedActions, usePrivy } from '@privy-io/expo';
 import { useUserWallets } from '../../../common/hooks/useUserWalletAddress';
 import { useFonts } from 'expo-font';
+import { useSyncUser } from '../../../common/hooks/useSyncUser';
 
 export default function PostAuthScreen() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function PostAuthScreen() {
   const wallets = useUserWallets();
   const privyContext = usePrivy() as any;
   const { user } = privyContext;
+  const { syncUser, isLoading: isSyncing, error: syncError } = useSyncUser();
 
   // Load the RockSalt font
   const [fontsLoaded] = useFonts({
@@ -55,67 +57,78 @@ export default function PostAuthScreen() {
 
   // Auto-navigate to home screen after authentication and delegation
   useEffect(() => {
-    const delegationPromises = [];
-    let delegationSuccess = false;
+    async function postAuthFlow() {
+      console.log('[PostAuth] Starting post-auth workflow');
+      // Step 1: sync or create user on backend
+      console.log('[PostAuth] Syncing user with backend');
+      const parsed = await syncUser();
+      if (parsed) {
+        console.log('[PostAuth] User sync successful:', parsed);
+      } else {
+        console.warn('[PostAuth] User sync failed:', syncError);
+      }
+      // Step 2: delegate wallets
+      console.log('[PostAuth] Starting wallet delegation');
+      const delegationPromises: Promise<string>[] = [];
 
-    // Only attempt to delegate Ethereum wallet if we have an Ethereum wallet address
-    if (wallets.ethereum) {
-      delegationPromises.push(
-        delegateWallet({ address: wallets.ethereum, chainType: 'ethereum' })
-          .then(() => {
-            console.log(`Successfully delegated Ethereum wallet: ${wallets.ethereum}`);
-            delegationSuccess = true;
-            return 'ethereum';
-          })
-          .catch((error) => {
-            console.error(`Failed to delegate wallet on Ethereum: ${wallets.ethereum}`, error);
-            return Promise.reject('ethereum');
-          })
-      );
-    }
+      // Only attempt to delegate Ethereum wallet if we have an Ethereum wallet address
+      if (wallets.ethereum) {
+        delegationPromises.push(
+          delegateWallet({ address: wallets.ethereum, chainType: 'ethereum' })
+            .then(() => {
+              console.log(`Successfully delegated Ethereum wallet: ${wallets.ethereum}`);
+              return 'ethereum';
+            })
+            .catch((error) => {
+              console.error(`Failed to delegate wallet on Ethereum: ${wallets.ethereum}`, error);
+              return Promise.reject('ethereum');
+            })
+        );
+      }
 
-    // Only attempt to delegate Solana wallet if we have a Solana wallet address
-    if (wallets.solana) {
-      delegationPromises.push(
-        delegateWallet({ address: wallets.solana, chainType: 'solana' })
-          .then(() => {
-            console.log(`Successfully delegated Solana wallet: ${wallets.solana}`);
-            delegationSuccess = true;
-            return 'solana';
-          })
-          .catch((error) => {
-            console.error(`Failed to delegate wallet on Solana: ${wallets.solana}`, error);
-            return Promise.reject('solana');
-          })
-      );
-    }
+      // Only attempt to delegate Solana wallet if we have a Solana wallet address
+      if (wallets.solana) {
+        delegationPromises.push(
+          delegateWallet({ address: wallets.solana, chainType: 'solana' })
+            .then(() => {
+              console.log(`Successfully delegated Solana wallet: ${wallets.solana}`);
+              return 'solana';
+            })
+            .catch((error) => {
+              console.error(`Failed to delegate wallet on Solana: ${wallets.solana}`, error);
+              return Promise.reject('solana');
+            })
+        );
+      }
 
-    if (delegationPromises.length > 0) {
-      // Run all available delegations concurrently
-      Promise.allSettled(delegationPromises)
-        .then((results) => {
-          logUserDetails();
-          
-          const successes = results.filter(r => r.status === 'fulfilled');
-          if (successes.length > 0) {
-            console.log('Successfully delegated wallets:', 
-              successes.map(r => (r as PromiseFulfilledResult<string>).value).join(', '));
-          } else {
-            console.log('No wallet delegations succeeded');
-          }
-          
+      if (delegationPromises.length > 0) {
+        // Run all available delegations concurrently
+        Promise.allSettled(delegationPromises)
+          .then((results) => {
+            logUserDetails();
+            
+            const successes = results.filter(r => r.status === 'fulfilled');
+            if (successes.length > 0) {
+              console.log('Successfully delegated wallets:', 
+                successes.map(r => (r as PromiseFulfilledResult<string>).value).join(', '));
+            } else {
+              console.log('No wallet delegations succeeded');
+            }
+            
+            router.push('/(tab)/home');
+          });
+      } else {
+        // If no wallet addresses are available, delay briefly then continue
+        const timer = setTimeout(() => {
+          console.log('No wallet addresses found for delegation, proceeding to home');
           router.push('/(tab)/home');
-        });
-    } else {
-      // If no wallet addresses are available, delay briefly then continue
-      const timer = setTimeout(() => {
-        console.log('No wallet addresses found for delegation, proceeding to home');
-        router.push('/(tab)/home');
-      }, 2000); // 2 seconds delay if no wallet address
+        }, 2000); // 2 seconds delay if no wallet address
 
-      return () => clearTimeout(timer);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [router, wallets, delegateWallet, user]);
+    postAuthFlow();
+  }, [router, wallets, delegateWallet, user, syncUser]);
 
   // If fonts are still loading, show a basic loading indicator
   if (!fontsLoaded) {
@@ -127,6 +140,16 @@ export default function PostAuthScreen() {
     );
   }
 
+  // Show syncing state if user sync is in progress
+  if (isSyncing) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#2D2D2D" />
+        <Text style={styles.signingInText}>Syncing user...</Text>
+      </View>
+    );
+  }
+  // Show delegation/loading state
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color="#2D2D2D" />
