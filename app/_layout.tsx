@@ -1,6 +1,6 @@
 import '../global.css';
 import { Stack } from 'expo-router';
-import { PrivyProvider, PrivyElements, usePrivy, useIdentityToken } from '@privy-io/expo';
+import { PrivyProvider, PrivyElements, usePrivy } from '@privy-io/expo';
 import { useEffect } from 'react';
 import NetworkStatus from '../components/toasts/NetworkStatus';
 import { CryptoDepositProvider } from '../components/context/CryptoDepositContext';
@@ -9,55 +9,17 @@ import { apiService } from '../api';
 // Initialize API configuration and set up
 function ApiInitializer() {
   const privy = usePrivy();
-  const { getIdentityToken } = useIdentityToken();
   
   useEffect(() => {
     // Only initialize once privy is ready and not null
     if (privy && privy.isReady) {
-      // Check if the token provider has the expected methods
-      const hasAccessToken = typeof privy.getAccessToken === 'function';
-      
-      console.log('=== Privy Token Provider Initialization ===');
-      console.log('Privy Ready:', privy.isReady);
-      console.log('User Authenticated:', !!privy.user);
-      console.log('Has getAccessToken method:', hasAccessToken);
-      console.log('Has getIdentityToken hook:', !!getIdentityToken);
-      console.log('=== End Privy Token Provider Initialization ===');
-
-      // Test the tokens functionality
-      async function testTokens() {
-        try {
-          if (hasAccessToken) {
-            const accessToken = await privy.getAccessToken();
-            console.log('Access Token Test Result:', accessToken ? 'Success' : 'Failed (null returned)');
-          }
-
-          if (getIdentityToken) {
-            const identityToken = await getIdentityToken();
-            console.log('Identity Token Test Result:', identityToken ? 'Success' : 'Failed (null returned)');
-          }
-        } catch (error) {
-          console.error('Error testing tokens:', error);
-        }
-      }
-
-      if (privy.user) {
-        testTokens();
-      }
-
-      // Create an enhanced provider that includes both the Privy instance and the getIdentityToken function
-      const enhancedProvider = {
-        ...privy,
-        getIdentityToken: getIdentityToken
-      };
-
-      // Initialize the API service with the enhanced token provider
-      apiService.setTokenProvider(enhancedProvider);
-      console.log('API service initialized with enhanced Privy token provider');
+      // Set the token provider only if it hasn't been set yet or if it changed
+      apiService.setTokenProvider(privy);
+      console.log('API service initialized with Privy token provider');
     }
-  }, [privy, privy?.isReady, privy?.user, getIdentityToken]);
+  }, [privy?.isReady]); // Only re-run when privy.isReady changes, not the entire privy object
 
-  return null;
+  return null; // This component doesn't render anything
 }
 
 export default function RootLayout() {

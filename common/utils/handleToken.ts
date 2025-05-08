@@ -4,7 +4,7 @@
 
 interface TokenProvider {
   getAccessToken: () => Promise<string | null>;
-  getIdentityToken?: () => Promise<string | null>;
+  getIdentityToken: () => Promise<string | null>;
   // Add any other methods from PrivyClient you might need here if you expand this function
 }
 
@@ -32,19 +32,15 @@ export async function getAuthTokens(tokenProvider: TokenProvider): Promise<AuthT
     // accessToken remains null, error is logged
   }
 
-  if (tokenProvider.getIdentityToken) {
-    try {
-      rawIdentityToken = await tokenProvider.getIdentityToken();
-    } catch (error) {
-      console.error('Error retrieving identity token:', error);
-      // rawIdentityToken remains null, error is logged
-    }
-  } else {
-    console.log('getIdentityToken method not available on token provider');
+  try {
+    rawIdentityToken = await tokenProvider.getIdentityToken();
+  } catch (error) {
+    console.error('Error retrieving identity token:', error);
+    // rawIdentityToken remains null, error is logged
   }
 
   return {
     accessToken,
-    identityToken: rawIdentityToken,
+    identityToken: rawIdentityToken ? `Bearer ${rawIdentityToken}` : null,
   };
 }

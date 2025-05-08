@@ -68,36 +68,32 @@ class ApiService {
           try {
             const authTokens = await getAuthTokens(this.tokenProvider);
             console.log('=== Authentication Tokens ===');
-            console.log('Full Identity Token:', authTokens.identityToken || 'Not available');
-            console.log('Full Access Token:', authTokens.accessToken || 'Not available');
+            console.log('Identity Token:', authTokens.identityToken ? `${authTokens.identityToken.substring(0, 20)}...` : 'Not available');
+            console.log('Access Token:', authTokens.accessToken ? `${authTokens.accessToken.substring(0, 20)}...` : 'Not available');
             console.log('=== End Authentication Tokens ===');
             
-            // Set the Authorization header with the Access Token
-            if (authTokens.accessToken) {
-              config.headers['Authorization'] = `Bearer ${authTokens.accessToken}`;
-              console.log('Setting Authorization header with Access Token.');
-            } else {
-              // Remove Authorization header if no access token is available
-              delete config.headers['Authorization'];
-              console.log('No Access Token available, Authorization header removed.');
-            }
-
-            // Set the x-identity-token header with the Identity Token
             if (authTokens.identityToken) {
-              config.headers['x-identity-token'] = authTokens.identityToken;
-              console.log('Setting x-identity-token header.');
-            } else {
-              // Remove x-identity-token header if no identity token is available
-              delete config.headers['x-identity-token'];
-              console.log('No Identity Token available, x-identity-token header removed.');
+              config.headers.Authorization = authTokens.identityToken;
             }
           } catch (error) {
             console.error('Error getting auth tokens:', error);
-            // Ensure headers are cleared on error
-            delete config.headers['Authorization'];
-            delete config.headers['x-identity-token'];
+          }
+        } 
+        // Otherwise, try to get token from storage (fallback)
+        else {
+          try {
+            const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            if (token) {
+              console.log('=== Token from Storage ===');
+              console.log('Auth Token:', token ? `${token.substring(0, 20)}...` : 'Not available');
+              console.log('=== End Token from Storage ===');
+              config.headers.Authorization = `Bearer ${token}`;
+            }
+          } catch (error) {
+            console.error('Error retrieving auth token from storage:', error);
           }
         }
+        
         return config;
       },
       (error) => {
@@ -230,55 +226,6 @@ class ApiService {
     } else {
       // Something happened in setting up the request that triggered an Error
       console.error('API Error:', error.message);
-    }
-  }
-
-  /**
-   * Create a new user or sync existing user based on authenticated user data
-   * This endpoint only accepts 'me' as the userId parameter
-   * 
-   * @returns Promise with user data including creation status
-   */
-  async createOrSyncUser(): Promise<{
-    userId: string;
-    userType: string;
-    timeCreated: string;
-    timeUpdated: string;
-    walletAddresses: {
-      ethereum?: string;
-      solana?: string;
-      bitcoin?: string;
-      tron?: string;
-    };
-    email: string;
-    isNewUser: boolean;
-  }> {
-    try {
-      console.log('=== User Account Creation Process Started ===');
-      if (this.tokenProvider) {
-        console.log('Privy Authentication Status:', this.tokenProvider.user ? 'Authenticated' : 'Not Authenticated');
-        console.log('Privy User ID:', this.tokenProvider.user?.id || 'Not available');
-      } else {
-        console.log('No token provider available');
-      }
-
-      // Call API to create or sync user
-      const response = await this.post('/users/me');
-      
-      console.log('=== User Account Creation Result ===');
-      console.log('Status: SUCCESS ✅');
-      console.log('Is New User:', response.isNewUser ? 'Yes' : 'No');
-      console.log('=== End User Account Creation Process ===');
-      
-      return response;
-    } catch (error) {
-      console.log('=== User Account Creation Error ===');
-      console.log('Status: ERROR ❌');
-      console.log('Error Message:', (error as Error).message);
-      console.log('=== End User Account Creation Process ===');
-      
-      this.handleApiError(error as AxiosError);
-      throw error;
     }
   }
 }

@@ -38,7 +38,7 @@ export default function SplashScreen() {
     );
   }
 
-  // If user is authenticated, redirect to the post-auth screen for next steps
+  // If user is authenticated, redirect to the post-auth onboarding screen within the (app) group
   if (user) {
     return <Redirect href="/(app)/post-auth" />;
   }
