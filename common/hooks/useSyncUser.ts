@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { usePrivy, useIdentityToken } from '@privy-io/expo';
 import { apiService } from '../../api';
 
@@ -58,7 +58,7 @@ interface UseSyncUserReturn {
  *
  * - Retrieves Privy user ID via usePrivy().
  * - Gets the Privy identity token via useIdentityToken().
- * - Calls POST /users/{userId} using apiService.
+ * - Calls POST /users/me using apiService.
  * - Parses and returns selected fields.
  *
  * Console.logs each step for detailed debugging.
@@ -71,12 +71,14 @@ export function useSyncUser(): UseSyncUserReturn {
   const privy = usePrivy() as any;
   // Hook to retrieve the identity token for authorization
   const { getIdentityToken } = useIdentityToken();
+  
+  // Memoize the user ID to prevent unnecessary re-renders
+  const userId = useMemo(() => privy.user?.id, [privy.user?.id]);
 
   const syncUser = useCallback(async (): Promise<ParsedUser | null> => {
     console.log('[useSyncUser] Starting user sync process');
 
     // Ensure we have a Privy user ID
-    const userId = privy.user?.id;
     if (!userId) {
       const msg = 'No Privy user ID available';
       console.error('[useSyncUser] Error:', msg);
@@ -98,8 +100,9 @@ export function useSyncUser(): UseSyncUserReturn {
         throw new Error('Failed to retrieve identity token');
       }
 
-      // Make API request to create or sync user
-      const endpoint = `/users/${userId}`;
+      // Make API request to create or sync user - use /users/me endpoint 
+      // which is handled by the API service's interceptors
+      const endpoint = '/users/me';
       console.log('[useSyncUser] Calling API endpoint:', endpoint);
       const response = await apiService.post<CreateUserApiResponse>(endpoint);
       console.log('[useSyncUser] Raw API response:', response);
@@ -136,7 +139,8 @@ export function useSyncUser(): UseSyncUserReturn {
       setIsLoading(false);
       console.log('[useSyncUser] Sync process complete');
     }
-  }, [privy.user?.id, getIdentityToken]);
+  // We use only userId since it's now memoized, reducing re-renders
+  }, [userId, getIdentityToken]);
 
   return { syncUser, isLoading, error };
 } 
