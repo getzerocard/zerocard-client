@@ -1,6 +1,6 @@
 import { useCallback, useState, useMemo } from 'react';
 import { usePrivy, useIdentityToken } from '@privy-io/expo';
-import { apiService } from '../../api';
+import { apiService } from '.';
 
 /**
  * Shape of the data returned from the user sync endpoint.
@@ -76,70 +76,72 @@ export function useSyncUser(): UseSyncUserReturn {
   const userId = useMemo(() => privy.user?.id, [privy.user?.id]);
 
   const syncUser = useCallback(async (): Promise<ParsedUser | null> => {
-    console.log('[useSyncUser] Starting user sync process');
-
     // Ensure we have a Privy user ID
     if (!userId) {
       const msg = 'No Privy user ID available';
-      console.error('[useSyncUser] Error:', msg);
+      console.error('[useSyncUser] Error: No Privy user ID available');
       setError(msg);
       return null;
     }
-    console.log('[useSyncUser] Privy user ID:', userId);
+
+    console.log('[useSyncUser] Starting user sync for user ID:', userId);
 
     setIsLoading(true);
     setError(null);
 
     try {
       // Retrieve identity token for backend authorization
-      console.log('[useSyncUser] Retrieving identity token from Privy');
+      console.log('[useSyncUser] Retrieving identity token...');
       const idToken = await getIdentityToken();
-      console.log('[useSyncUser] Identity token retrieved:', idToken);
+      console.log('[useSyncUser] Identity token retrieved:', idToken ? 'Token exists' : 'No token');
 
       if (!idToken) {
         throw new Error('Failed to retrieve identity token');
       }
 
-      // Make API request to create or sync user - use /users/me endpoint 
-      // which is handled by the API service's interceptors
+      // Make API request to create or sync user
       const endpoint = '/users/me';
-      console.log('[useSyncUser] Calling API endpoint:', endpoint);
+      console.log('[useSyncUser] Making API request to:', endpoint);
       const response = await apiService.post<CreateUserApiResponse>(endpoint);
-      console.log('[useSyncUser] Raw API response:', response);
+      console.log('[useSyncUser] API response received:', response ? 'Response exists' : 'No response');
+
+      // Check if response data is valid
+      if (!response || !response.data || !response.data.data) {
+        console.error('[useSyncUser] Invalid response data received from API');
+        throw new Error('Invalid response data received from API');
+      }
+
+      console.log('[useSyncUser] Response data valid, processing user data');
 
       // Parse the data from the response
-      const { data } = response;
-      console.log('[useSyncUser] Parsed response data:', data);
+      const userData = response.data.data;
 
       const parsed: ParsedUser = {
-        userId: data.userId,
-        userType: data.userType,
-        timeCreated: data.timeCreated,
-        timeUpdated: data.timeUpdated,
-        walletAddresses: data.walletAddresses,
-        email: data.email,
-        isNewUser: data.isNewUser,
+        userId: userData.userId,
+        userType: userData.userType,
+        timeCreated: userData.timeCreated,
+        timeUpdated: userData.timeUpdated,
+        walletAddresses: userData.walletAddresses,
+        email: userData.email,
+        isNewUser: userData.isNewUser,
       };
-      console.log('[useSyncUser] Final parsed user object:', parsed);
 
+      console.log('[useSyncUser] User sync successful for:', userData.userId);
       return parsed;
     } catch (err: any) {
-      // Detailed error logging for debugging
-      console.error('[useSyncUser] ❌ API Request Config:', err.config);
-      console.error('[useSyncUser] ❌ API Response Status:', err.response?.status);
-      console.error('[useSyncUser] ❌ API Response Headers:', err.response?.headers);
-      console.error('[useSyncUser] ❌ API Response Data:', err.response?.data);
-      console.error('[useSyncUser] ❌ Error Request:', err.request);
-      console.error('[useSyncUser] ❌ Error Message:', err.message);
       // Set a user-friendly error message
       const message = err?.response?.data?.message || err?.message || 'Unknown error during user sync';
+      console.error('[useSyncUser] Error during sync:', message);
+      console.error('[useSyncUser] Full error details:', err);
+      if (err?.response) {
+        console.error('[useSyncUser] Response status:', err.response.status);
+        console.error('[useSyncUser] Response data:', err.response.data);
+      }
       setError(message);
       return null;
     } finally {
       setIsLoading(false);
-      console.log('[useSyncUser] Sync process complete');
     }
-  // We use only userId since it's now memoized, reducing re-renders
   }, [userId, getIdentityToken]);
 
   return { syncUser, isLoading, error };

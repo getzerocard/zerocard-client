@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useHeadlessDelegatedActions, usePrivy } from '@privy-io/expo';
 import { useUserWallets } from '../../../common/hooks/useUserWalletAddress';
 import { useFonts } from 'expo-font';
-import { useSyncUser } from '../../../common/hooks/useSyncUser';
+import { useSyncUser } from '../../../api/createSyncUser';
 
 export default function PostAuthScreen() {
   const router = useRouter();

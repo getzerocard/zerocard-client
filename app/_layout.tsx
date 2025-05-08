@@ -6,16 +6,38 @@ import {
   usePrivy,
   useIdentityToken,
 } from '@privy-io/expo';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import NetworkStatus from '../components/toasts/NetworkStatus';
 import { CryptoDepositProvider } from '../components/context/CryptoDepositContext';
 import { apiService } from '../api';
 import { TokenGetters } from '../common/utils/handleToken';
 
+// Import apiService directly for initialization check
+import '../api/api';
+
 // Initialize API configuration and set up
 function ApiInitializer() {
   const privy = usePrivy();
   const { getIdentityToken } = useIdentityToken();
+  const [apiInitAttempts, setApiInitAttempts] = useState(0);
+
+  // Check if apiService is initialized
+  useEffect(() => {
+    console.log('[ApiInitializer] Initializing apiService check, attempt:', apiInitAttempts);
+    
+    if (!apiService) {
+      console.error('[ApiInitializer] apiService is undefined on initialization check.');
+      // Try again after a delay, up to 5 attempts
+      if (apiInitAttempts < 5) {
+        const timer = setTimeout(() => {
+          setApiInitAttempts(prev => prev + 1);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      console.log('[ApiInitializer] apiService is defined and ready for configuration.');
+    }
+  }, [apiInitAttempts]);
 
   // Memoize values to prevent re-renders
   const isReady = useMemo(() => privy?.isReady, [privy?.isReady]);
@@ -80,19 +102,29 @@ function ApiInitializer() {
   useEffect(() => {
     console.log('[ApiInitializer] Effect triggered. Privy ready:', isReady, 'getIdentityToken available:', typeof getIdentityToken === 'function');
     
-    if (tokenAccessors) {
-      console.log('[ApiInitializer] Configuring ApiService with token accessors...');
-      apiService.setTokenAccessors(tokenAccessors);
-      console.log('[ApiInitializer] ApiService token accessors configured successfully.');
-    } else {
-      let logReason = '[ApiInitializer] Conditions not met for ApiService configuration:';
-      if (!isReady) logReason += ' Privy not ready;';
-      if (!user) logReason += ' No Privy user;';
-      if (!getAccessTokenFn) logReason += ' getAccessToken not available;';
-      if (typeof getIdentityToken !== 'function') logReason += ' getIdentityToken not a function;';
-      console.log(logReason);
-    }
-  }, [tokenAccessors, isReady, user, getIdentityToken]);
+    // Add a delay to ensure everything is initialized
+    const timer = setTimeout(() => {
+      if (tokenAccessors && apiService) {
+        console.log('[ApiInitializer] Configuring ApiService with token accessors after delay...');
+        console.log('[ApiInitializer] apiService imported:', !!apiService);
+        apiService.setTokenAccessors(tokenAccessors);
+        console.log('[ApiInitializer] ApiService token accessors configured successfully.');
+      } else if (!apiService) {
+        console.error('[ApiInitializer] Error: apiService is still undefined after delay. Cannot configure token accessors.');
+        // Attempt to reinitialize by triggering a state update
+        setApiInitAttempts(prev => prev + 1);
+      } else {
+        let logReason = '[ApiInitializer] Conditions not met for ApiService configuration after delay:';
+        if (!isReady) logReason += ' Privy not ready;';
+        if (!user) logReason += ' No Privy user;';
+        if (!getAccessTokenFn) logReason += ' getAccessToken not available;';
+        if (typeof getIdentityToken !== 'function') logReason += ' getIdentityToken not a function;';
+        console.log(logReason);
+      }
+    }, 1000); // Delay of 1 second to ensure initialization
+    
+    return () => clearTimeout(timer);
+  }, [tokenAccessors, isReady, user, getIdentityToken, apiInitAttempts]);
 
   return null;
 }
