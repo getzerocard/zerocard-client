@@ -55,22 +55,22 @@ export class ApiService {
       async (config) => {
         if (this.tokenAccessors) {
           try {
-            const { accessToken, identityToken, sessionToken } = await getAuthTokens(this.tokenAccessors);
+            const { accessToken, identityToken } = await getAuthTokens(this.tokenAccessors);
 
             if (identityToken) {
-              // Set Authorization header with identity token as fallback if others not available
-              const authToken = accessToken || sessionToken || identityToken;
-              
-              config.headers = {
-                ...config.headers,
-                'Authorization': `Bearer ${authToken}`,
-                'x-identity-token': identityToken,
-              } as any;
-            }
+              // Set Authorization header strictly with access token, no fallback
+              if (accessToken) {
+                config.headers = {
+                  ...config.headers,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'x-identity-token': identityToken,
+                } as any;
+              }
 
-            // Handle URL special patterns - rewrite /users/{id} to /users/me
-            if (config.url?.match(/\/users\/(did:privy:[^\/]+|:userId|{userId})/)) {
-              config.url = config.url.replace(/\/users\/[^\/]+/, '/users/me');
+              // Handle URL special patterns - rewrite /users/{id} to /users/me
+              if (config.url?.match(/\/users\/(did:privy:[^\/]+|:userId|{userId})/)) {
+                config.url = config.url.replace(/\/users\/[^\/]+/, '/users/me');
+              }
             }
           } catch (err) {
             console.error('[ApiService] Error in request interceptor:', err);

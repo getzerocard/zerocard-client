@@ -35,14 +35,14 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="auto" />
       <AuthGuard>
-        {/* Global modal providers that work across the entire app */}
-        <DepositModalProvider walletId={walletId}>
-          <UsernameModalProvider>
-            <RootSiblingParent>
-              <Slot />
-            </RootSiblingParent>
-          </UsernameModalProvider>
-        </DepositModalProvider>
+      {/* Global modal providers that work across the entire app */}
+      <DepositModalProvider walletId={walletId}>
+        <UsernameModalProvider>
+          <RootSiblingParent>
+            <Slot />
+          </RootSiblingParent>
+        </UsernameModalProvider>
+      </DepositModalProvider>
       </AuthGuard>
     </SafeAreaProvider>
   );

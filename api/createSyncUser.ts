@@ -51,6 +51,8 @@ interface UseSyncUserReturn {
   isLoading: boolean;
   /** Error message if sync failed, otherwise null */
   error: string | null;
+  /** Whether a successful sync has already occurred */
+  isSynced: boolean;
 }
 
 /**
@@ -66,6 +68,7 @@ interface UseSyncUserReturn {
 export function useSyncUser(): UseSyncUserReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSynced, setIsSynced] = useState(false);
 
   // Privy context provides the current authenticated user
   const privy = usePrivy() as any;
@@ -76,6 +79,12 @@ export function useSyncUser(): UseSyncUserReturn {
   const userId = useMemo(() => privy.user?.id, [privy.user?.id]);
 
   const syncUser = useCallback(async (): Promise<ParsedUser | null> => {
+    // Prevent sync if already synced
+    if (isSynced) {
+      console.log('[useSyncUser] Sync already completed, skipping...');
+      return null;
+    }
+
     // Ensure we have a Privy user ID
     if (!userId) {
       const msg = 'No Privy user ID available';
@@ -102,7 +111,7 @@ export function useSyncUser(): UseSyncUserReturn {
       // Make API request to create or sync user
       const endpoint = '/users/me';
       console.log('[useSyncUser] Making API request to:', endpoint);
-      const response = await apiService.post<CreateUserApiResponse>(endpoint);
+      const response = await apiService.post<CreateUserApiResponse>(endpoint, {});
       console.log('[useSyncUser] API response received:', response ? 'Response exists' : 'No response');
 
       // Check if response data is valid
@@ -127,6 +136,7 @@ export function useSyncUser(): UseSyncUserReturn {
       };
 
       console.log('[useSyncUser] User sync successful for:', userData.userId);
+      setIsSynced(true); // Mark as synced
       return parsed;
     } catch (err: any) {
       // Set a user-friendly error message
@@ -142,7 +152,7 @@ export function useSyncUser(): UseSyncUserReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, getIdentityToken]);
+  }, [userId, getIdentityToken, isSynced]);
 
-  return { syncUser, isLoading, error };
+  return { syncUser, isLoading, error, isSynced };
 } 

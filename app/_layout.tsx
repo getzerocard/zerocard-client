@@ -66,49 +66,45 @@ function ApiInitializer() {
           return null;
         }
       },
-      getIdentityToken,
-      // Add the session token getter
-      getSessionToken: async () => {
-        try {
-          // In Privy, we need to find the right method for session tokens
-          // First check if privy has any session or auth token method
-          if (privy) {
-            // Use type assertion and optional chaining for safety
-            const privyAny = privy as any;
-            if (typeof privyAny?.getSessionToken === 'function') {
-              console.log('[ApiInitializer] Calling privy.getSessionToken()...');
-              return await privyAny.getSessionToken();
-            } else if (typeof privyAny?.getAuthToken === 'function') {
-              console.log('[ApiInitializer] Calling privy.getAuthToken()...');
-              return await privyAny.getAuthToken();
-            } else if (typeof privyAny?.getSession === 'function') {
-              console.log('[ApiInitializer] Calling privy.getSession()...');
-              const session = await privyAny.getSession();
-              // Return token from session if available
-              return session?.token || null;
-            }
-          }
-          
-          console.log('[ApiInitializer] No session token method available, falling back to identity token...');
-          return null;
-        } catch (error) {
-          console.error('[ApiInitializer] Error getting session token:', error);
-          return null;
-        }
-      }
+      getIdentityToken
     } as TokenGetters;
   }, [isReady, user, getAccessTokenFn, getIdentityToken]);
+
+  // State to track if apiService is configured
+  const [isApiConfigured, setIsApiConfigured] = useState(false);
 
   useEffect(() => {
     console.log('[ApiInitializer] Effect triggered. Privy ready:', isReady, 'getIdentityToken available:', typeof getIdentityToken === 'function');
     
+    // Prevent reconfiguration if already done
+    if (isApiConfigured) {
+      console.log('[ApiInitializer] ApiService already configured, skipping...');
+      return;
+    }
+
     // Add a delay to ensure everything is initialized
-    const timer = setTimeout(() => {
-      if (tokenAccessors && apiService) {
+    const timer = setTimeout(async () => {
+      if (tokenAccessors && apiService && user) {
         console.log('[ApiInitializer] Configuring ApiService with token accessors after delay...');
         console.log('[ApiInitializer] apiService imported:', !!apiService);
-        apiService.setTokenAccessors(tokenAccessors);
-        console.log('[ApiInitializer] ApiService token accessors configured successfully.');
+        // Fetch tokens to ensure they are available before configuration
+        let identityToken = null;
+        let accessToken = null;
+        if (tokenAccessors.getIdentityToken) {
+          identityToken = await tokenAccessors.getIdentityToken();
+        }
+        if (tokenAccessors.getAccessToken) {
+          accessToken = await tokenAccessors.getAccessToken();
+        }
+        if (identityToken && accessToken) {
+          apiService.setTokenAccessors(tokenAccessors);
+          console.log('[ApiInitializer] ApiService token accessors configured successfully with both tokens available.');
+          setIsApiConfigured(true);
+        } else {
+          console.log('[ApiInitializer] Tokens not yet available. Identity Token:', identityToken ? 'Available' : 'Not available', 'Access Token:', accessToken ? 'Available' : 'Not available');
+          // Retry if tokens are not available
+          setApiInitAttempts(prev => prev + 1);
+        }
       } else if (!apiService) {
         console.error('[ApiInitializer] Error: apiService is still undefined after delay. Cannot configure token accessors.');
         // Attempt to reinitialize by triggering a state update
@@ -120,13 +116,14 @@ function ApiInitializer() {
         if (!getAccessTokenFn) logReason += ' getAccessToken not available;';
         if (typeof getIdentityToken !== 'function') logReason += ' getIdentityToken not a function;';
         console.log(logReason);
+        setApiInitAttempts(prev => prev + 1);
       }
     }, 1000); // Delay of 1 second to ensure initialization
     
     return () => clearTimeout(timer);
-  }, [tokenAccessors, isReady, user, getIdentityToken, apiInitAttempts]);
+  }, [tokenAccessors, isReady, user, getIdentityToken, apiInitAttempts, isApiConfigured]);
 
-  return null;
+  return isApiConfigured;
 }
 
 export default function RootLayout() {
@@ -134,6 +131,9 @@ export default function RootLayout() {
   // Ensure these are defined in your .env file and prefixed correctly (e.g., EXPO_PUBLIC_)
   const privyAppId = process.env.EXPO_PUBLIC_PRIVY_APP_ID || '';
   const privyClientId = process.env.EXPO_PUBLIC_PRIVY_CLIENT_ID || '';
+
+  const [isPrivyReady, setIsPrivyReady] = useState(false);
+  const [privyUser, setPrivyUser] = useState<any>(null);
 
   useEffect(() => {
     // Log API base URL for debugging
@@ -144,7 +144,6 @@ export default function RootLayout() {
     console.log('=== Privy Configuration Debug ===');
     console.log('Privy App ID from ENV:', privyAppId);
     console.log('Privy Client ID from ENV:', privyClientId);
-    // Removed logging Expo Constants as it's not relevant for Privy IDs anymore
     console.log('=== End Privy Configuration Debug ===');
 
     // Optional: Add a check to ensure the environment variables are loaded
@@ -164,6 +163,18 @@ export default function RootLayout() {
     return null;
   }
 
+  const PrivyStatusChecker = () => {
+    const privy = usePrivy();
+    useEffect(() => {
+      if (privy) {
+        setIsPrivyReady(privy.isReady);
+        setPrivyUser(privy.user);
+        console.log('[PrivyStatusChecker] Privy is ready:', privy.isReady, 'User:', privy.user ? 'Available' : 'Not available');
+      }
+    }, [privy, privy?.isReady, privy?.user]);
+    return null;
+  };
+
   return (
     <PrivyProvider 
       appId={privyAppId} 
@@ -179,22 +190,23 @@ export default function RootLayout() {
         },
       }}
     >
-      {/* Initialize API service with Privy token provider */}
-      <ApiInitializer />
-      
-      <CryptoDepositProvider>
-        {/* Network status toast notification */}
-        <NetworkStatus />
+      <PrivyStatusChecker />
+      {/* Initialize API service with Privy token provider only when Privy is ready */}
+      {isPrivyReady && privyUser && <ApiInitializer /> && (
+        <CryptoDepositProvider>
+          {/* Network status toast notification */}
+          <NetworkStatus />
 
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: '#f7f7f7' },
-          }}
-        >
-          <Stack.Screen name="(tab)" options={{ headerShown: false }} />
-        </Stack>
-      </CryptoDepositProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: '#f7f7f7' },
+            }}
+          >
+            <Stack.Screen name="(tab)" options={{ headerShown: false }} />
+          </Stack>
+        </CryptoDepositProvider>
+      )}
       <PrivyElements />
     </PrivyProvider>
   );
