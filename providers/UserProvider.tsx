@@ -15,6 +15,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [isReadyState, setIsReady] = useState(false);
   const [isLoadingUserCreation, setIsLoadingUserCreation] = useState(false);
   const [isMounted, setIsMounted] = useState(false); // Track if layout is mounted
+  const [hasNavigated, setHasNavigated] = useState(false); // Track if navigation has occurred
   const createUser = useCreateUser();
   const router = useRouter();
 
@@ -37,13 +38,14 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           // Set session flag to indicate active session only after successful login
           setActiveSession(true);
           // Delay navigation to ensure layout is fully mounted
-          if (isMounted) {
+          if (isMounted && !hasNavigated) {
             setTimeout(() => {
               if (data.isNewUser) {
                 router.replace('/(app)/post-auth');
               } else {
                 router.replace('/(tab)/home');
               }
+              setHasNavigated(true); // Mark navigation as done
             }, 100); // Small delay to ensure navigation stack is ready
           }
         },
@@ -58,9 +60,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
           // Clear session flag on logout due to error
           setActiveSession(false);
           // Delay navigation to ensure layout is fully mounted
-          if (isMounted) {
+          if (isMounted && !hasNavigated) {
             setTimeout(() => {
               router.replace('/'); // Back to login
+              setHasNavigated(true); // Mark navigation as done
             }, 100);
           }
         },
@@ -73,8 +76,9 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       setIsReady(true); // Ensure the app is ready after logout (so the UI doesn't block)
       // Clear session flag when user logs out
       setActiveSession(false);
+      setHasNavigated(false); // Reset navigation tracking
     }
-  }, [privyReady, user, isMounted]);
+  }, [privyReady, user, isMounted, hasNavigated]);
 
   // Delegate wallets after user logs in
   useEffect(() => {
@@ -112,9 +116,10 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       setIsReady(false); // Reset isReady while the logout process is ongoing
       // Clear session flag on logout
       setActiveSession(false);
-      if (isMounted) {
+      if (isMounted && !hasNavigated) {
         setTimeout(() => {
           router.replace('/'); // Redirect to login screen
+          setHasNavigated(true); // Mark navigation as done
         }, 100);
       }
     } catch (err) {
@@ -128,13 +133,14 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
       // If user is already logged in on app startup, set ready state
       setIsReady(true);
       setActiveSession(true);
-      if (isMounted) {
+      if (isMounted && !hasNavigated) {
         setTimeout(() => {
           router.replace('/(tab)/home');
+          setHasNavigated(true); // Mark navigation as done
         }, 100); // Delay navigation to ensure stack is ready
       }
     }
-  }, [privyReady, user, isReadyState, isLoadingUserCreation, isMounted]);
+  }, [privyReady, user, isReadyState, isLoadingUserCreation, isMounted, hasNavigated]);
 
   return (
     <UserContext.Provider value={{ isReady: isReadyState, isLoadingUserCreation }}>
