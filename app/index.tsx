@@ -2,10 +2,10 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator } fr
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SvgXml } from 'react-native-svg';
-import { usePrivy, useLogin, useHeadlessDelegatedActions, useIdentityToken } from '@privy-io/expo';
-import { Redirect } from 'expo-router';
-import { useEffect, useState } from 'react';
-import useWalletDelegation from './useWalletDelegation';
+import { usePrivy, useLogin } from '@privy-io/expo';
+import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { useDelegationStore } from '../store/delegationStore';
 
 // Import the Zerocard logo as a string
 const zerocardLogo = `<svg width="37" height="28" viewBox="0 0 37 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -23,29 +23,18 @@ const zerocardLogo = `<svg width="37" height="28" viewBox="0 0 37 28" fill="none
 </svg>`;
 
 export default function SplashScreen() {
-  const privyContext = usePrivy() as any;
-  const { user } = privyContext;
-  const ready = privyContext.isReady === true;
+  const { user, isReady: isPrivyReady } = usePrivy();
   const { login } = useLogin();
-  const { getIdentityToken } = useIdentityToken();
+  const { hasActiveSession } = useDelegationStore();
+  const ready = isPrivyReady;
+  const router = useRouter();
 
-  // Once Privy is ready and a user is present, fetch and log the raw identity token
-  useEffect(() => {
-    if (ready && user) {
-      console.log('[SplashScreen] → Privy ready, user detected. Fetching identity token…');
-      getIdentityToken()
-        .then((token) => {
-          if (token) {
-            console.log('[SplashScreen] ✅ Identity Token:', token);
-          } else {
-            console.warn('[SplashScreen] ⚠️ No identity token (user not logged in?)');
-          }
-        })
-        .catch((err) => {
-          console.error('[SplashScreen] ❌ Error fetching identity token:', err);
-        });
-    }
-  }, [ready, user]);
+  // Removed navigation logic to prevent early navigation before root layout is mounted
+  // useEffect(() => {
+  //   if (ready && user) {
+  //     router.replace('/(app)/post-auth');
+  //   }
+  // }, [ready, user, router]);
 
   // Show loading state while Privy initializes
   if (!ready) {
@@ -56,10 +45,28 @@ export default function SplashScreen() {
       </View>
     );
   }
-
-  // If user is authenticated, redirect to the post-auth onboarding screen within the (app) group
+  //TODO: the loading state that shows after login 
   if (user) {
-    return <Redirect href="/(app)/post-auth" />;
+    // Check for active session flag to decide whether to show loading state
+    if (hasActiveSession) {
+      // For existing sessions, minimize loading state visibility
+      console.log('Existing session detected, minimizing loading state');
+      setTimeout(() => {
+        console.log('Timeout reached for syncing user data - existing session');
+      }, 50); // Very short timeout for existing sessions
+    } else {
+      // For fresh logins, show loading state briefly
+      console.log('Fresh login detected, showing brief loading state');
+      setTimeout(() => {
+        console.log('Timeout reached for syncing user data - fresh login');
+      }, 100); // Slightly longer for fresh logins
+    }
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#40ff00" />
+        <Text style={styles.loadingText}>Syncing user data...</Text>
+      </View>
+    );
   }
 
   const handleStartSpending = async () => {
@@ -67,12 +74,7 @@ export default function SplashScreen() {
       await login({ loginMethods: ['email'] });
       console.log('Login initiated successfully');
     } catch (error: any) {
-      // Log all errors to terminal for debugging
-      console.log('=== Login Error Details ===');
-      console.log('Error type:', error?.name);
-      console.log('Error message:', error?.message);
-      console.log('Error stack:', error?.stack);
-      console.log('=== End Error Details ===');
+      console.error('Login error:', error);
     }
   };
 

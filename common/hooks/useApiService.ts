@@ -1,7 +1,7 @@
-import { useIdentityTokenProvider } from '../app/(app)/context/identityTokenContexts';
-import { useAccessTokenProvider } from '../app/(app)/context/accessTokenContext';
+import { useIdentityTokenProvider } from '../../app/(app)/context/identityTokenContexts';
+import { useAccessTokenProvider } from '../../app/(app)/context/accessTokenContext';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://[::1]:3000/api/v1';
 
 export function useApiService() {
   const { getIdentityToken } = useIdentityTokenProvider();
@@ -10,23 +10,24 @@ export function useApiService() {
   const fetchWithTokens = async (
     endpoint: string,
     options: RequestInit = {},
-    useIdentityTokenFlag: boolean = true,
+    useIdentityToken: boolean = true,
     useAccessTokenFlag: boolean = true
   ): Promise<Response> => {
     const headers = new Headers(options.headers as HeadersInit || {});
     headers.set('Accept', 'application/json');
 
-    if (useIdentityTokenFlag && getIdentityToken) {
-      const idToken = await getIdentityToken();
+    if (useIdentityToken) {
+      const idToken = await getIdentityToken?.();
       if (idToken) headers.set('x-identity-token', idToken);
     }
 
-    if (useAccessTokenFlag && getAccessToken) {
-      const accessToken = await getAccessToken();
+    if (useAccessTokenFlag) {
+      const accessToken = await getAccessToken?.();
       if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
     }
 
     const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+
     const requestOptions: RequestInit = {
       ...options,
       headers,
@@ -37,7 +38,6 @@ export function useApiService() {
       const errorText = await response.text().catch(() => 'Unknown error');
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
-
     return response;
   };
 
@@ -70,4 +70,4 @@ export function useApiService() {
     delete: (endpoint: string, options: RequestInit = {}) =>
       fetchWithTokens(endpoint, { ...options, method: 'DELETE' }),
   };
-}
+} 

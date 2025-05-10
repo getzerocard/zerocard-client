@@ -70,13 +70,13 @@ export default function TabLayout() {
             }}
           />
           <Tabs.Screen
-            name="load-wallet"
+            name="load-wallet/index"
             options={{
               title: 'Load Wallet',
             }}
           />
           <Tabs.Screen
-            name="profile"
+            name="profile/index"
             options={{
               title: 'Profile',
             }}
