@@ -7,6 +7,8 @@ import {
   ScrollView,
   Image,
   Platform,
+  KeyboardAvoidingView,
+  StatusBar,
 } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,9 +18,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GreetingHeader } from '../../../components/layout/GreetingHeader';
 import CardModule from '../../../components/features/card/CardModule';
 import CardStatusComponent from '../../../components/features/card/CardStatus';
-import UsernameModal from '../../../components/modals/username/UsernameModal';
-import AndroidUsernameModal from '../../../components/ui/modal/username/AndroidUsernameModal';
 import CardControls from '../../../components/features/card/CardControls';
+import { useUsernameModal } from '../../../components/modals/username/hooks/useUsernameModal';
 import { TransactionItem } from '../../../components/features/transactions/TransactionItem';
 import CardTypeModal from '../../../components/modals/card-type/CardTypeModal';
 import SpendingLimitDialog from '../../../components/modals/spending-limit/SpendingLimitDialog';
@@ -41,9 +42,15 @@ const profileIcon = require('../../../assets/prrofile-icon.png');
 // User onboarding stages
 type UserStage = 'new_user' | 'ordered_card' | 'activated_card' | 'has_transactions';
 
+import { useIdentityTokenProvider } from '../../(app)/context/identityTokenContexts';
+import { useAccessTokenProvider } from '../../(app)/context/accessTokenContext';
+
 export default function HomeScreen() {
+  console.log('[HomeScreen] Rendering');
   const { user, logout } = usePrivy() as any;
   const insets = useSafeAreaInsets();
+  // State for username
+  const [username, setUsername] = useState<string>('');
   const {
     showLimitToast,
     showWithdrawalToast,
@@ -59,15 +66,63 @@ export default function HomeScreen() {
   // Use the crypto deposit listener hook
   const { handleNewDeposit } = useCryptoDepositListener();
 
+  // ---- For Token Logging ----
+  const { getIdentityToken } = useIdentityTokenProvider();
+  const { getAccessToken } = useAccessTokenProvider();
+
+  useEffect(() => {
+    const logTokens = async () => {
+      try {
+        const identityToken = await getIdentityToken();
+        console.log('DEBUG: Full Identity Token:', identityToken);
+        if (identityToken && identityToken.split('.').length === 3) {
+          try {
+            const base64Url = identityToken.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            // In React Native, direct atob might not be universally available or safe without a polyfill.
+            // For quick debugging, this might work in some environments, but prefer a library for robustness.
+            // const decodedPayload = atob(base64);
+            // console.log('DEBUG: Decoded Identity Token Payload (raw):', decodedPayload);
+            // const jsonPayload = JSON.parse(decodedPayload);
+            // console.log('DEBUG: Decoded Identity Token Payload (JSON):', jsonPayload);
+            console.log('DEBUG: Identity Token Payload (base64 part):', base64Url); // Log the part to decode manually if needed
+          } catch (e) {
+            console.warn('DEBUG: Could not decode Identity Token payload in app:', e);
+          }
+        }
+
+        const accessToken = await getAccessToken();
+        console.log('DEBUG: Full Access Token:', accessToken);
+        if (accessToken && accessToken.split('.').length === 3) {
+          try {
+            const base64Url = accessToken.split('.')[1];
+            // const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            // const decodedPayload = atob(base64);
+            // console.log('DEBUG: Decoded Access Token Payload (raw):', decodedPayload);
+            // const jsonPayload = JSON.parse(decodedPayload);
+            // console.log('DEBUG: Decoded Access Token Payload (JSON):', jsonPayload);
+            console.log('DEBUG: Access Token Payload (base64 part):', base64Url); // Log the part to decode manually if needed
+          } catch (e) {
+            console.warn('DEBUG: Could not decode Access Token payload in app:', e);
+          }
+        }
+      } catch (error) {
+        console.error('DEBUG: Error fetching tokens for logging:', error);
+      }
+    };
+    // Only run once on mount for debugging purposes
+    logTokens();
+  }, [getIdentityToken, getAccessToken]); // Dependencies are stable
+  // ---- End Token Logging ----
+
   // State for user's stage in the onboarding process
   const [userStage, setUserStage] = useState<UserStage>('new_user');
 
-  // State for username modal
-  const [usernameModalVisible, setUsernameModalVisible] = useState(false);
-  const [username, setUsername] = useState<string>('');
-
-  // State for Android username modal
-  const [androidUsernameModalVisible, setAndroidUsernameModalVisible] = useState(false);
+  // Use the username modal hook without explicit show option
+  const { 
+    ModalComponent,
+    modalProps
+  } = useUsernameModal(); // Call without options
 
   // State for card type modal
   const [cardTypeModalVisible, setCardTypeModalVisible] = useState(false);
@@ -93,7 +148,7 @@ export default function HomeScreen() {
     }
   }, [showWithdrawalToast]);
 
-  // Load saved state from AsyncStorage
+  // Load saved state from AsyncStorage and check for username
   useEffect(() => {
     const loadSavedState = async () => {
       try {
@@ -102,9 +157,14 @@ export default function HomeScreen() {
         const cardOrdered = await AsyncStorage.getItem('card_ordered');
         const savedUsername = await AsyncStorage.getItem('username');
 
-        // If we have a saved username, use it
+        // Log the username from AsyncStorage and rely on UserProvider for isNewUser logic
+        console.log('[HomeScreen] loadSavedState - savedUsername from AsyncStorage:', savedUsername);
+
         if (savedUsername) {
-          setUsername(savedUsername);
+          setUsername(savedUsername); // Still set for display purposes
+        } else {
+          // The modal visibility is now solely handled by useUsernameModal based on isNewUser from context
+          console.log('[HomeScreen] No local username found in AsyncStorage. Modal visibility determined by UserProvider.');
         }
 
         // If card was ordered, update the stage
@@ -117,49 +177,25 @@ export default function HomeScreen() {
     };
 
     loadSavedState();
-  }, []);
+  }, []); // Dependency array is empty again, as this primarily loads local state.
 
   // Get username from state or email as fallback
   const displayName = username || (user?.email ? user.email.split('@')[0] : '');
   const userInitial = displayName && displayName.length > 0 ? displayName[0].toUpperCase() : 'U';
 
-  // On Android, show Android username modal when in new_user stage
-  useEffect(() => {
-    if (Platform.OS === 'android' && userStage === 'new_user' && !username) {
-      setAndroidUsernameModalVisible(true);
-    }
-  }, [userStage, username]);
-
-  // Open username modal automatically for new users after 1 second (iOS only)
-  useEffect(() => {
-    if (userStage === 'new_user' && Platform.OS === 'ios' && !username) {
-      const timer = setTimeout(() => {
-        setUsernameModalVisible(true);
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [userStage, username]);
-
-  // Handle username setup
-  const handleSetUsername = async (newUsername: string) => {
-    setUsername(newUsername);
-    setUsernameModalVisible(false);
-    setAndroidUsernameModalVisible(false);
-
-    // Save username to AsyncStorage
-    try {
-      await AsyncStorage.setItem('username', newUsername);
-      await AsyncStorage.setItem('user_verified', 'true');
-    } catch (error) {
-      console.error('Error saving username:', error);
-    }
-  };
+  
 
   // Handle profile press - on Android, show username modal
   const handleProfilePress = () => {
     if (Platform.OS === 'android') {
-      setAndroidUsernameModalVisible(true);
+      // To re-show the modal on Android (e.g., to change username):
+      // 1. The useUsernameModal hook needs to expose a function like `showModal()`
+      // 2. Or, this component needs to manage a local state to pass `visible={true}` to ModalComponent.
+      // For now, removing the direct call to handleSetUsername.
+      // If the modal should be re-shown, that logic needs to be added to useUsernameModal
+      // and a function to trigger it exposed from there.
+      console.log('[HomeScreen] Profile pressed on Android. Modal re-show logic TBD if needed.');
+      // Example: if (showUsernameChangeModal) showUsernameChangeModal();
     } else {
       // On iOS, profile press logs out
       handleLogout();
@@ -279,130 +315,140 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Toast notification */}
-      <SpendingLimitToast visible={toastVisible} onDismiss={() => setToastVisible(false)} />
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {/* Toast notification */}
+        <SpendingLimitToast visible={toastVisible} onDismiss={() => setToastVisible(false)} />
 
-      {/* Card Type Modal (Common) */}
-      <CardTypeModal
-        visible={cardTypeModalVisible}
-        onClose={() => setCardTypeModalVisible(false)}
-        onSelectCardType={handleSelectCardType}
-      />
-      
-      {/* Tracking Status Modal (Now common) */}
-      <TrackingStatusModal
-        visible={trackingStatusModalVisible}
-        onClose={() => setTrackingStatusModalVisible(false)}
-        estimatedDeliveryDate={getEstimatedDeliveryDate()}
-        currentStatus={getCurrentTrackingStatus()}
-      />
-
-      {/* Crypto Deposit Modal */}
-      <CryptoDepositModal />
-
-      {/* Fixed Header */}
-      <View style={[styles.fixedHeader, { paddingTop: insets.top > 0 ? 8 : 4 }]}>
-        <GreetingHeader
-          username={displayName}
-          profileImage={profileIcon}
-          onProfilePress={handleProfilePress}
+        {/* Card Type Modal (Common) */}
+        <CardTypeModal
+          visible={cardTypeModalVisible}
+          onClose={() => setCardTypeModalVisible(false)}
+          onSelectCardType={handleSelectCardType}
         />
-      </View>
+        
+        {/* Tracking Status Modal (Now common) */}
+        <TrackingStatusModal
+          visible={trackingStatusModalVisible}
+          onClose={() => setTrackingStatusModalVisible(false)}
+          estimatedDeliveryDate={getEstimatedDeliveryDate()}
+          currentStatus={getCurrentTrackingStatus()}
+        />
 
-      <ScrollView
-        style={styles.scrollContent}
-        contentContainerStyle={styles.scrollContentContainer}
-        showsVerticalScrollIndicator={false}>
-        {/* Card Module */}
-        <View style={styles.cardModuleContainer}>
-          <CardModule />
+        {/* Crypto Deposit Modal */}
+        <CryptoDepositModal />
+
+        {/* Fixed Header */}
+        <View style={[styles.fixedHeader, { paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight ? StatusBar.currentHeight + 4 : insets.top + 4 }]}>
+          <GreetingHeader
+            username={displayName}
+            profileImage={profileIcon}
+            onProfilePress={handleProfilePress}
+          />
         </View>
 
-        {/* Card Status - Only show for new users and users who ordered a card */}
-        {(userStage === 'new_user' || userStage === 'ordered_card') && (
-          <View style={styles.cardStatusContainer}>
-            <CardStatusComponent
-              status={userStage === 'new_user' ? 'not_found' : 'ordered'}
-              onPrimaryButtonPress={
-                userStage === 'new_user'
-                  ? handleOrderCard
-                  : () => router.push('/(app)/card-activation/qr-scanner')
-              }
-              onSecondaryButtonPress={
-                userStage === 'new_user' ? handleLoadWallet : handleCheckStatus
-              }
-            />
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Card Module */}
+          <View style={styles.cardModuleContainer}>
+            <CardModule />
           </View>
-        )}
 
-        {/* Card Controls - Only show for users with activated cards */}
-        {(userStage === 'activated_card' || userStage === 'has_transactions') && (
-          <View style={styles.cardControlsContainer}>
-            <CardControls
-              onLoadCard={() => {
-                console.log('Load card pressed');
-              }}
-              onFreezeCard={() => {
-                console.log('Freeze card pressed');
-              }}
-            />
-          </View>
-        )}
-
-        {/* Spending Limit Dialog - Only show for users with activated cards */}
-        {(userStage === 'activated_card' || userStage === 'has_transactions') && (
-          <View style={styles.spendingLimitContainer}>
-            <SpendingLimitDialog onPress={handleSpendingLimitPress} />
-          </View>
-        )}
-
-        {/* Transactions Section - Only show for users with activated cards */}
-        {(userStage === 'activated_card' || userStage === 'has_transactions') && (
-          <View style={styles.transactionsContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Transactions</Text>
-              <Text style={styles.sectionAction}>View All</Text>
+          {/* Card Status - Only show for new users and users who ordered a card */}
+          {(userStage === 'new_user' || userStage === 'ordered_card') && (
+            <View style={styles.cardStatusContainer}>
+              <CardStatusComponent
+                status={userStage === 'new_user' ? 'not_found' : 'ordered'}
+                onPrimaryButtonPress={
+                  userStage === 'new_user'
+                    ? handleOrderCard
+                    : () => router.push('/(app)/card-activation/qr-scanner')
+                }
+                onSecondaryButtonPress={
+                  userStage === 'new_user' ? handleLoadWallet : handleCheckStatus
+                }
+              />
             </View>
+          )}
 
-            {/* Show transactions or empty state based on user stage */}
-            {userStage === 'has_transactions'
-              ? mockData.transactions.map((transaction) => (
-                  <TransactionItem
-                    key={transaction.id}
-                    id={transaction.id}
-                    type={transaction.amount > 0 ? 'deposit' : 'spend'}
-                    name={transaction.name}
-                    amount={Math.abs(transaction.amount)}
-                    date={transaction.date}
-                    time={transaction.timestamp.split('T')[1].substring(0, 5)}
-                    currency="USDC"
-                    category={transaction.category}
-                  />
-                ))
-              : renderEmptyTransactions()}
+          {/* Card Controls - Only show for users with activated cards */}
+          {(userStage === 'activated_card' || userStage === 'has_transactions') && (
+            <View style={styles.cardControlsContainer}>
+              <CardControls
+                onLoadCard={() => {
+                  console.log('Load card pressed');
+                }}
+                onFreezeCard={() => {
+                  console.log('Freeze card pressed');
+                }}
+              />
+            </View>
+          )}
+
+          {/* Spending Limit Dialog - Only show for users with activated cards */}
+          {(userStage === 'activated_card' || userStage === 'has_transactions') && (
+            <View style={styles.spendingLimitContainer}>
+              <SpendingLimitDialog onPress={handleSpendingLimitPress} />
+            </View>
+          )}
+
+          {/* Transactions Section - Only show for users with activated cards */}
+          {(userStage === 'activated_card' || userStage === 'has_transactions') && (
+            <View style={styles.transactionsContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Recent Transactions</Text>
+                <Text style={styles.sectionAction}>View All</Text>
+              </View>
+
+              {/* Show transactions or empty state based on user stage */}
+              {userStage === 'has_transactions'
+                ? mockData.transactions.map((transaction) => (
+                    <TransactionItem
+                      key={transaction.id}
+                      id={transaction.id}
+                      type={transaction.amount > 0 ? 'deposit' : 'spend'}
+                      name={transaction.name}
+                      amount={Math.abs(transaction.amount)}
+                      date={transaction.date}
+                      time={transaction.timestamp.split('T')[1].substring(0, 5)}
+                      currency="USDC"
+                      category={transaction.category}
+                    />
+                  ))
+                : renderEmptyTransactions()}
+            </View>
+          )}
+
+          {/* Simulation Button - For testing the order card flow */}
+          <View style={styles.simulationContainer}>
+            <TouchableOpacity
+              style={styles.simulationButton}
+              onPress={handleSimulateOrderCard}
+            >
+              <Ionicons name="card-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.simulationButtonText}>Simulate Order Card Flow</Text>
+            </TouchableOpacity>
           </View>
+        </ScrollView>
+
+        {/* Withdrawal success toast overlay */}
+        {withdrawalToastVisible && toastAmount && toastAddress && (
+          <WithdrawalToast
+            amount={toastAmount as string}
+            address={toastAddress as string}
+            onHide={() => setWithdrawalToastVisible(false)}
+          />
         )}
 
-        {/* Simulation Button - For testing the order card flow */}
-        <View style={styles.simulationContainer}>
-          <TouchableOpacity
-            style={styles.simulationButton}
-            onPress={handleSimulateOrderCard}
-          >
-            <Ionicons name="card-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.simulationButtonText}>Simulate Order Card Flow</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-
-      {/* Withdrawal success toast overlay */}
-      {withdrawalToastVisible && toastAmount && toastAddress && (
-        <WithdrawalToast
-          amount={toastAmount as string}
-          address={toastAddress as string}
-          onHide={() => setWithdrawalToastVisible(false)}
-        />
-      )}
+        {/* Username Modal */}
+        {ModalComponent && <ModalComponent {...modalProps} />}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

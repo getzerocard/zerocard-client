@@ -5,6 +5,7 @@ import Squircle from 'react-native-squircle';
 import mockData from '../../../assets/mockdata.json';
 import { usePrivy } from '@privy-io/expo';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 
 // Import SVG icons
@@ -103,16 +104,28 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   };
 
   const handleLogout = async () => {
+    console.log('[ProfileSettings] handleLogout initiated.');
     try {
-      // Clear any secure storage
+      console.log('[ProfileSettings] Attempting to clear user_session from SecureStore...');
       await SecureStore.deleteItemAsync('user_session');
+      console.log('[ProfileSettings] user_session cleared from SecureStore successfully.');
+
+      console.log('[ProfileSettings] Attempting to clear username from AsyncStorage...');
+      await AsyncStorage.removeItem('username');
+      console.log('[ProfileSettings] username cleared from AsyncStorage successfully.');
       
-      // Logout from Privy
+      console.log('[ProfileSettings] Attempting to logout from Privy...');
       await privy.logout();
+      console.log('[ProfileSettings] Privy logout successful.');
       
       console.log('Successfully logged out');
     } catch (error) {
       console.error('Error during logout:', error);
+      if (error instanceof Error) {
+        console.error(`[ProfileSettings] Logout error details: ${error.message}`, error.stack);
+      } else {
+        console.error('[ProfileSettings] Logout error details: An unknown error object was thrown.', error);
+      }
     }
   };
 

@@ -5,12 +5,10 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-  AppState,
-  AppStateStatus,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import * as Network from 'expo-network';
 import * as Haptics from 'expo-haptics';
+import { useNetworkStatusCheck, NetworkStatusType } from '../../common/hooks/useNetworkStatusCheck';
 
 // SVG icons for network states
 const networkErrorSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -24,127 +22,19 @@ const networkPoorSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="no
 <path d="M18 12C18.5523 12 19 11.5523 19 11C19 10.4477 18.5523 10 18 10C17.4477 10 17 10.4477 17 11C17 11.5523 17.4477 12 18 12Z" fill="#E99F00"/>
 </svg>`;
 
-// Network status types
-type NetworkStatusType = 'POOR' | 'NONE' | null;
-
 interface NetworkStatusProps {
-  // Optional onClose callback
   onClose?: () => void;
 }
 
-// Track failed network requests globally to detect poor connectivity
-const failedRequests = {
-  count: 0,
-  lastCheck: 0,
-  resetTime: 60000, // Reset counter after 1 minute
-};
-
 const NetworkStatus: React.FC<NetworkStatusProps> = ({ onClose }) => {
-  // State to track network status
-  const [networkStatus, setNetworkStatus] = useState<NetworkStatusType>(null);
+  const networkStatus = useNetworkStatusCheck();
+  const [currentDisplayStatus, setCurrentDisplayStatus] = useState<NetworkStatusType>(null);
 
-  // Animation values
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-
-  // Timer for auto-dismissing poor connectivity toast
   const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Window dimensions for positioning
   const { width } = Dimensions.get('window');
 
-  // Track if active ping is in progress
-  const isPingingRef = useRef(false);
-
-  // Last check time to prevent excessive checks
-  const lastCheckTimeRef = useRef(0);
-
-  // Track app state for optimized checking
-  const appStateRef = useRef(AppState.currentState);
-
-  // Lighter ping function that only checks a single local server
-  // Only used when necessary
-  const performLightPing = async (): Promise<boolean> => {
-    // If already pinging, don't start another
-    if (isPingingRef.current) return true;
-
-    // Only check once every 30 seconds max to preserve battery
-    const now = Date.now();
-    if (now - lastCheckTimeRef.current < 30000) {
-      return true; // Assume connection is still good
-    }
-
-    try {
-      isPingingRef.current = true;
-
-      // Use a single reliable server, preferably in Nigeria or nearby
-      const response = await fetch('https://www.google.com.ng', {
-        method: 'HEAD',
-        cache: 'no-cache',
-        // Use a longer timeout (3s) for Nigerian network conditions
-        signal: AbortSignal.timeout(3000),
-      });
-
-      isPingingRef.current = false;
-      lastCheckTimeRef.current = now;
-
-      return response.ok;
-    } catch (error) {
-      isPingingRef.current = false;
-      lastCheckTimeRef.current = now;
-      return false;
-    }
-  };
-
-  // Optimized network check that uses multiple indicators
-  // but minimizes resource usage
-  const checkNetworkStatus = async (forceCheck: boolean = false) => {
-    try {
-      // Only check when app is in foreground to save battery
-      if (appStateRef.current !== 'active' && !forceCheck) {
-        return;
-      }
-
-      // Get basic network info (uses cached values when available)
-      const networkState = await Network.getNetworkStateAsync();
-
-      // No connection case is straightforward
-      if (!networkState.isConnected || !networkState.isInternetReachable) {
-        setNetworkStatus('NONE');
-        return;
-      }
-
-      // Detect poor connectivity using multiple signals
-      let isPoorConnection = false;
-
-      // 1. Check connection type - basic indicator
-      const isCellular = networkState.type === Network.NetworkStateType.CELLULAR;
-
-      // 2. Check if we've had failed network requests recently
-      const now = Date.now();
-      if (now - failedRequests.lastCheck > failedRequests.resetTime) {
-        // Reset counter periodically
-        failedRequests.count = 0;
-        failedRequests.lastCheck = now;
-      }
-
-      // If we've had multiple failed requests recently, that's a sign of poor connection
-      if (failedRequests.count >= 2) {
-        isPoorConnection = true;
-      }
-      // If on cellular, lower our expectations for Nigerian networks
-      // Only ping when on cellular and no recent failures (saves resources)
-      else if (isCellular && !(await performLightPing())) {
-        isPoorConnection = true;
-      }
-
-      setNetworkStatus(isPoorConnection ? 'POOR' : null);
-    } catch (error) {
-      console.error('Error checking network status:', error);
-    }
-  };
-
-  // Function to animate the toast in
   const animateIn = () => {
     Animated.parallel([
       Animated.timing(translateY, {
@@ -160,7 +50,6 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ onClose }) => {
     ]).start();
   };
 
-  // Function to animate the toast out
   const animateOut = (callback?: () => void) => {
     Animated.parallel([
       Animated.timing(translateY, {
@@ -178,115 +67,51 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ onClose }) => {
     });
   };
 
-  // Global listener for network requests
-  // This is the most efficient way to detect problems
   useEffect(() => {
-    // Patch global fetch to track failures
-    const originalFetch = global.fetch;
-    global.fetch = async (...args) => {
-      try {
-        const response = await originalFetch(...args);
-        return response;
-      } catch (error) {
-        // Record the failure for our passive detection
-        failedRequests.count++;
-        failedRequests.lastCheck = Date.now();
-
-        // Check network after a failure
-        checkNetworkStatus(true);
-
-        throw error;
+    if (networkStatus === 'POOR') {
+      if (currentDisplayStatus !== 'POOR') {
+        setCurrentDisplayStatus('POOR');
+        animateIn();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
-    };
-
-    // Restore original fetch on unmount
-    return () => {
-      global.fetch = originalFetch;
-    };
-  }, []);
-
-  // Handle app state changes to conserve battery
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      // Only check network when app comes to foreground
-      if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
-        checkNetworkStatus(true);
-      }
-
-      appStateRef.current = nextAppState;
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  // Set up timer for auto-dismissing poor connectivity toast
-  useEffect(() => {
-    if (networkStatus === 'POOR' && !dismissTimerRef.current) {
-      // Show the toast
-      animateIn();
-
-      // Trigger warning haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-
-      // Set a timer to dismiss after 3.5 seconds
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
       dismissTimerRef.current = setTimeout(() => {
         animateOut(() => {
-          setNetworkStatus(null);
-          dismissTimerRef.current = null;
+          setCurrentDisplayStatus(null);
+          if (onClose) onClose();
         });
+        dismissTimerRef.current = null;
       }, 3500);
     } else if (networkStatus === 'NONE') {
-      // Show the no connectivity toast
-      animateIn();
-
-      // Trigger error haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-
-      // Clear any existing dismiss timer
+      if (currentDisplayStatus !== 'NONE') {
+        setCurrentDisplayStatus('NONE');
+        animateIn();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
         dismissTimerRef.current = null;
       }
-    } else if (networkStatus === null) {
-      // Hide the toast
-      animateOut();
-
-      // Clear any existing dismiss timer
+    } else if (networkStatus === null && currentDisplayStatus !== null) {
+      animateOut(() => {
+        setCurrentDisplayStatus(null);
+      });
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
         dismissTimerRef.current = null;
       }
     }
 
-    // Clean up timer on unmount
     return () => {
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
       }
     };
-  }, [networkStatus]);
+  }, [networkStatus, currentDisplayStatus, onClose]);
 
-  // Check network initially and set up very infrequent checks
-  useEffect(() => {
-    // Initial check
-    checkNetworkStatus(true);
+  if (currentDisplayStatus === null) return null;
 
-    // Set up less frequent checks (once per minute) to minimize resource usage
-    const intervalId = setInterval(() => checkNetworkStatus(), 60000);
-
-    // Clean up interval on unmount
-    return () => clearInterval(intervalId);
-  }, []);
-
-  // Don't render anything if network status is null
-  if (networkStatus === null) return null;
-
-  // Content based on network status
-  const isPoorConnectivity = networkStatus === 'POOR';
+  const isPoorConnectivity = currentDisplayStatus === 'POOR';
   const title = isPoorConnectivity ? 'Poor connectivity' : 'No connectivity';
   const message = isPoorConnectivity
     ? 'You are experiencing a weak internet\nconnection.'
@@ -300,13 +125,12 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ onClose }) => {
         {
           transform: [{ translateY }],
           opacity,
-          width: width - 40, // 20px margin on each side
-          top: 60, // Position from top - increased from 40 to 60
+          width: width - 40,
+          top: 60,
         },
       ]}>
       <View style={styles.content}>
         <SvgXml xml={iconSvg} width={24} height={24} />
-
         <View style={styles.textContainer}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message} numberOfLines={2}>
