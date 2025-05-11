@@ -1,0 +1,19 @@
+{
+    "success": true,
+    "statusCode": 200,
+    "message": "Operation successful",
+    "data": {
+      "userId": "did:privy:cm94emxt901iyl50l4zr9bg7h",
+      "userType": "parent_user",
+      "timeCreated": "2025-05-09T08:01:22.530Z",
+      "timeUpdated": "2025-05-09T08:01:22.530Z",
+      "walletAddresses": {
+        "ethereum": "0xcEd72e4B802500014B260a80e565C86B1003540D",
+        "solana": "AYFKqCBMAtVhKV8PzRo3sQq3bnVaEiWbrSXyDtqjkmmF",
+        "bitcoin": "",
+        "tron": ""
+      },
+      "email": "seyi357412@outlook.com",
+      "isNewUser": false
+    }
+  }

@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, Linking, Platform } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import Squircle from 'react-native-squircle';
-import mockData from '../../../assets/mockdata.json';
 import { usePrivy } from '@privy-io/expo';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
+import { useSettingsStore } from '../../../store/settingsStore';
+import AccountInfoSection from './AccountInfoSection';
+import AppSettingsSection from './AppSettingsSection';
+import AboutLinksSection from './AboutLinksSection';
+import UserActionsSection from './UserActionsSection';
 
 // Import SVG icons
 const profileIconSvg = `<svg width="24" height="24" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -59,253 +63,32 @@ const arrowUpIconSvg = `<svg width="24" height="24" viewBox="0 0 18 18" fill="no
 </svg>`;
 
 interface ProfileSettingsProps {
-  /**
-   * Callback when a setting is selected
-   */
   onSettingPress?: (settingId: string) => void;
-  
-  /**
-   * Callback when logout is pressed
-   */
   onLogout?: () => void;
-  
-  /**
-   * Current notification settings status
-   * @default false
-   */
-  notificationsEnabled?: boolean;
+  fullName: string;
+  email: string;
+  phone: string;
+  spendingLimitDisplay?: string;
+  showSpendingLimit: boolean;
 }
 
 const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   onSettingPress,
   onLogout,
-  notificationsEnabled = false
+  fullName,
+  email,
+  phone,
+  spendingLimitDisplay,
+  showSpendingLimit,
 }) => {
-  const [biometricsEnabled, setBiometricsEnabled] = useState(true);
-  const userData = mockData.user || {};
-  const privy = usePrivy();
-
-  // Set default values or use values from mockData
-  const username = userData.username || 'Temidayo Folajin';
-  const email = userData.email || 'dayofolajin@gmail.com';
-  const phone = '+44 7563 543 710'; // Default phone number since it's not in mockData
-
-  const handleHelpPress = () => {
-    Linking.openURL('https://www.zerocard.com/help');
-  };
-
-  const handleTermsPress = () => {
-    Linking.openURL('https://www.zerocard.com/terms');
-  };
-
-  const handlePrivacyPress = () => {
-    Linking.openURL('https://www.zerocard.com/privacy');
-  };
-
-  const handleLogout = async () => {
-    try {
-      // Clear any secure storage
-      await SecureStore.deleteItemAsync('user_session');
-      
-      // Logout from Privy
-      await privy.logout();
-      
-      console.log('Successfully logged out');
-    } catch (error) {
-      console.error('Error during logout:', error);
-    }
-  };
-
-  const handleCloseAccount = () => {
-    // Handle close account logic
-    console.log('Closing account...');
-  };
-
-  // Settings data
-  const settings = [
-    {
-      id: 'profile',
-      title: 'Profile',
-      icon: profileIconSvg,
-      path: '/(app)/profile/edit',
-    },
-    {
-      id: 'notifications',
-      title: 'Notifications',
-      icon: notificationIconSvg,
-      path: '/(app)/settings/notifications',
-      isToggle: true,
-      isEnabled: notificationsEnabled,
-    },
-    {
-      id: 'privacy',
-      title: 'Privacy',
-      icon: privacyIconSvg,
-      path: '/(app)/settings/privacy',
-    },
-    {
-      id: 'logout',
-      title: 'Logout',
-      icon: logoutIconSvg,
-      isDestructive: true,
-    },
-  ];
-
-  const handleSettingPress = (setting: typeof settings[0]) => {
-    if (setting.id === 'logout') {
-      if (onLogout) {
-        onLogout();
-      } else {
-        console.log('Logout pressed');
-        // Implement logout functionality
-      }
-      return;
-    }
-    
-    if (onSettingPress) {
-      onSettingPress(setting.id);
-    } else if (setting.path) {
-      router.push(setting.path as any);
-    }
-  };
+  const { notificationsEnabled } = useSettingsStore();
 
   return (
     <View style={styles.container}>
-      {/* ACCOUNT Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>ACCOUNT</Text>
-        </View>
-        <Squircle
-          style={styles.squircleContainer}
-          borderRadius={16}
-          borderSmoothing={1}
-          backgroundColor="#FFFFFF">
-          <View style={styles.sectionContentInner}>
-            {/* Name */}
-            <View style={[styles.row, styles.topRow]}>
-              <View style={styles.rowLeft}>
-                <SvgXml xml={profileIconSvg} width={24} height={24} />
-                <Text style={styles.rowLabel}>Name</Text>
-              </View>
-              <Text style={styles.rowValue}>{username}</Text>
-            </View>
-
-            {/* Email */}
-            <View style={styles.row}>
-              <View style={styles.rowLeft}>
-                <SvgXml xml={emailIconSvg} width={24} height={24} />
-                <Text style={styles.rowLabel}>Email</Text>
-              </View>
-              <Text style={styles.rowValue}>{email}</Text>
-            </View>
-
-            {/* Phone */}
-            <View style={[styles.row, styles.bottomRow]}>
-              <View style={styles.rowLeft}>
-                <SvgXml xml={phoneIconSvg} width={24} height={24} />
-                <Text style={styles.rowLabel}>Phone number</Text>
-              </View>
-              <Text style={styles.rowValue}>{phone}</Text>
-            </View>
-          </View>
-        </Squircle>
-      </View>
-
-      {/* APP Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>APP</Text>
-        </View>
-        <Squircle
-          style={styles.squircleContainer}
-          borderRadius={16}
-          borderSmoothing={1}
-          backgroundColor="#FFFFFF">
-          <View style={styles.sectionContentInner}>
-            {/* Biometrics */}
-            <View style={[styles.row, styles.singleRow]}>
-              <View style={styles.rowLeft}>
-                <SvgXml xml={biometricsIconSvg} width={24} height={24} />
-                <Text style={styles.rowLabel}>Biometrics</Text>
-              </View>
-              <Switch
-                value={biometricsEnabled}
-                onValueChange={setBiometricsEnabled}
-                trackColor={{ false: '#E8E8E8', true: '#00D743' }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor="#E8E8E8"
-                style={styles.switch}
-              />
-            </View>
-          </View>
-        </Squircle>
-      </View>
-
-      {/* ABOUT Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>ABOUT</Text>
-        </View>
-        <Squircle
-          style={styles.squircleContainer}
-          borderRadius={16}
-          borderSmoothing={1}
-          backgroundColor="#FFFFFF">
-          <View style={styles.sectionContentInner}>
-            {/* Help Center */}
-            <TouchableOpacity style={[styles.row, styles.topRow]} onPress={handleHelpPress}>
-              <View style={styles.rowLeft}>
-                <SvgXml xml={helpIconSvg} width={24} height={24} />
-                <Text style={styles.rowLabel}>Help Center</Text>
-              </View>
-              <SvgXml xml={arrowUpIconSvg} width={24} height={24} />
-            </TouchableOpacity>
-
-            {/* Terms of Use */}
-            <TouchableOpacity style={styles.row} onPress={handleTermsPress}>
-              <View style={styles.rowLeft}>
-                <SvgXml xml={termIconSvg} width={24} height={24} />
-                <Text style={styles.rowLabel}>Term of Use</Text>
-              </View>
-              <SvgXml xml={arrowUpIconSvg} width={24} height={24} />
-            </TouchableOpacity>
-
-            {/* Privacy Policy */}
-            <TouchableOpacity style={[styles.row, styles.bottomRow]} onPress={handlePrivacyPress}>
-              <View style={styles.rowLeft}>
-                <SvgXml xml={privacyIconSvg} width={24} height={24} />
-                <Text style={styles.rowLabel}>Privacy Policy</Text>
-              </View>
-              <SvgXml xml={arrowUpIconSvg} width={24} height={24} />
-            </TouchableOpacity>
-          </View>
-        </Squircle>
-      </View>
-
-      {/* Logout Section */}
-      <View style={[styles.section, styles.logoutSection]}>
-        <Squircle
-          style={styles.squircleContainer}
-          borderRadius={16}
-          borderSmoothing={1}
-          backgroundColor="#FFFFFF">
-          <View style={styles.sectionContentInner}>
-            {/* Logout */}
-            <TouchableOpacity style={[styles.row, styles.topRow]} onPress={handleLogout}>
-              <View style={styles.rowLeft}>
-                <SvgXml xml={logoutIconSvg} width={24} height={24} />
-                <Text style={[styles.rowLabel, styles.logoutText]}>Log out</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Close Account */}
-            <TouchableOpacity style={[styles.row, styles.bottomRow]} onPress={handleCloseAccount}>
-              <Text style={[styles.rowLabel, styles.closeAccountText]}>Close account</Text>
-            </TouchableOpacity>
-          </View>
-        </Squircle>
-      </View>
+      <AccountInfoSection fullName={fullName} email={email} phone={phone} />
+      <AppSettingsSection spendingLimitDisplay={spendingLimitDisplay} showSpendingLimit={showSpendingLimit} />
+      <AboutLinksSection />
+      <UserActionsSection onLogoutProp={onLogout} />
     </View>
   );
 };
@@ -316,20 +99,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   section: {
-    marginBottom: 0,
-  },
-  logoutSection: {
-    marginTop: 8,
-  },
-  sectionHeader: {
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-  },
-  sectionHeaderText: {
-    fontFamily: 'System',
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#A3A3A3',
+    // Common section styling if any, or handled by individual section components
+    // marginBottom might be set here if all sections have a common bottom margin
   },
   squircleContainer: {
     shadowColor: '#000',
@@ -337,6 +108,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 1,
     elevation: 1,
+    marginHorizontal: 0, // Assuming sections might have their own horizontal padding if needed
   },
   sectionContentInner: {
     overflow: 'hidden',
@@ -348,17 +120,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: '#E8E8E8',
+    backgroundColor: '#FFFFFF', // Added for clarity if not part of Squircle
   },
-  topRow: {
-    // No need for border radius here as it's handled by Squircle
-  },
+  topRow: {},
   bottomRow: {
     borderBottomWidth: 0,
-    // No need for border radius here as it's handled by Squircle
-  },
-  singleRow: {
-    borderBottomWidth: 0,
-    // No need for border radius here as it's handled by Squircle
   },
   rowLeft: {
     flexDirection: 'row',
@@ -371,21 +137,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#333333',
   },
-  rowValue: {
-    fontFamily: 'System',
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#A3A3A3',
-  },
-  switch: {
-    transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }],
-  },
-  logoutText: {
-    color: '#C9252D',
-  },
-  closeAccountText: {
-    color: '#818181',
-  },
+  // ... other styles like sectionHeader, sectionHeaderText might be removed if not used directly here
 });
 
 export default ProfileSettings;

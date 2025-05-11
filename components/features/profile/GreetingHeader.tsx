@@ -34,7 +34,7 @@ export default function GreetingHeader({
     if (onProfilePress) {
       onProfilePress();
     } else {
-      router.push('/(tab)/profile/index');
+      router.push('/(tab)/profile');
     }
   };
 
