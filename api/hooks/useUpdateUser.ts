@@ -15,13 +15,14 @@ interface UpdateUserPayload {
   shippingAddress?: ShippingAddress;
 }
 
+// Variables now only include the payload, userId is inferred by the /me endpoint
 interface UpdateUserVariables {
-  userId: string;
   payload: UpdateUserPayload;
 }
 
 // Define a more specific type if the structure of 'data' from PATCH response is known
-// For now, using 'any'. Ideally, this would be the updated User object type.	ype UpdateUserData = any; 
+// For now, using 'any'. Ideally, this would be the updated User object type.
+type UpdateUserData = any; 
 
 interface ApiResponse<T> {
   success: boolean;
@@ -40,12 +41,12 @@ export const useUpdateUser = () => {
     UpdateUserVariables
   >({
     mutationFn: async (variables: UpdateUserVariables) => {
-      const { userId, payload } = variables;
-      // The endpoint in the cURL example is /api/v1/users/{userId}
-      // Assuming apiService handles the /api/v1 prefix, so we use /users/{userId}
-      const response = await apiService.patch(
-        `/users/${encodeURIComponent(userId)}`,
-        payload
+      const { payload } = variables;
+      // Changed endpoint to /users/me
+      const response = await apiService.post(
+        `/users/me`,
+        payload,
+        { method: 'PATCH' }
       );
       const jsonResponse: ApiResponse<UpdateUserData> = await response.json();
 
@@ -57,8 +58,7 @@ export const useUpdateUser = () => {
     onSuccess: (data, variables) => {
       // Invalidate and refetch the user query to reflect the updated data
       queryClient.invalidateQueries({ queryKey: ['user'] });
-      // Optionally, if you have a query specific to the user ID, you can invalidate that too
-      // queryClient.invalidateQueries({ queryKey: ['user', variables.userId] });
+      // Since we used /me, invalidating the general ['user'] key is appropriate.
     },
     mutationKey: ['updateUser'],
   });

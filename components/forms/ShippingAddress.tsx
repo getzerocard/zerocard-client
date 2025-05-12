@@ -14,6 +14,8 @@ import { useFonts } from 'expo-font';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import { useOrderCardStore, OrderAddressDetails } from '../../store/orderCardStore';
+import { router } from 'expo-router';
 
 // Import close icon SVG
 const closeIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -58,6 +60,7 @@ interface AddressData {
 interface AutocompleteResult {
   properties: {
     formatted: string;
+    street?: string;
     city?: string;
     state?: string;
     postcode?: string;
@@ -216,7 +219,7 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
   const handleAddressSelect = (address: AutocompleteResult) => {
     console.log('Selected address:', JSON.stringify(address, null, 2));
     setSelectedAddress(address);
-    setStreet(address.properties.formatted || '');
+    setStreet(address.properties.street || address.properties.formatted || '');
     setCity(address.properties.city || '');
     setState(address.properties.state || '');
     setPostalCode(address.properties.postcode || '');
@@ -227,19 +230,29 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
   const handleContinue = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+    const currentAddressData: AddressData = {
+      street,
+      city,
+      state,
+      postalCode,
+      fullAddress: selectedAddress?.properties.formatted,
+      longitude: selectedAddress?.properties.lon,
+      latitude: selectedAddress?.properties.lat,
+    };
+
+    // Save to the new orderCardStore
+    const { setShippingAddress } = useOrderCardStore.getState();
+    const orderAddressDetails: OrderAddressDetails = {
+      street: currentAddressData.street,
+      city: currentAddressData.city,
+      state: currentAddressData.state,
+      postalCode: currentAddressData.postalCode,
+    };
+    setShippingAddress(orderAddressDetails);
+
     // Call the onContinue prop if provided
     if (onContinue) {
-      const addressData: AddressData = {
-        street,
-        city,
-        state,
-        postalCode,
-        fullAddress: selectedAddress?.properties.formatted,
-        longitude: selectedAddress?.properties.lon,
-        latitude: selectedAddress?.properties.lat,
-      };
-
-      onContinue(addressData);
+      onContinue(currentAddressData);
     }
   };
 
@@ -250,6 +263,7 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
         const draftData = { street, city, state, postalCode };
         await AsyncStorage.setItem(ADDRESS_DRAFT_KEY, JSON.stringify(draftData));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.navigate('/');
       }
     } catch (error) {
       console.error('Error saving draft:', error);

@@ -17,3 +17,80 @@
       "isNewUser": false
     }
   }
+
+
+
+
+
+
+
+  API response status: 200
+ (NOBRIDGE) LOG  API response data: {
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "country": "Nigeria",
+        "country_code": "ng",
+        "state": "Oyo State",
+        "county": "Afijio",
+        "city": "Aguo",
+        "street": "Oyo Road",
+        "iso3166_2": "NG-OY",
+        "datasource": {
+          "sourcename": "openstreetmap",
+          "attribution": "© OpenStreetMap contributors",
+          "license": "Open Database License",
+          "url": "https://www.openstreetmap.org/copyright"
+        },
+        "lon": 3.9156503,
+        "lat": 7.7101577,
+        "result_type": "street",
+        "formatted": "Oyo Road, Aguo, Oyo State, Nigeria",
+        "address_line1": "Oyo Road",
+        "address_line2": "Aguo, Oyo State, Nigeria",
+        "timezone": {
+          "name": "Africa/Lagos",
+          "offset_STD": "+01:00",
+          "offset_STD_seconds": 3600,
+          "offset_DST": "+01:00",
+          "offset_DST_seconds": 3600,
+          "abbreviation_STD": "WAT",
+          "abbreviation_DST": "WAT"
+        },
+        "plus_code": "6FV5PW68+37",
+        "rank": {
+          "confidence": 1,
+          "confidence_city_level": 1,
+          "confidence_street_level": 1,
+          "match_type": "full_match"
+        },
+        "place_id": "51a994e87640530f4059a402829433d71e40f00102f901d9a7890d00000000c00204"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.9156503,
+          7.7101577
+        ]
+      },
+      "bbox": [
+        3.9102912,
+        7.589866,
+        3.9242467,
+        7.8287564
+      ]
+    }
+  ],
+  "query": {
+    "text": "Oyo Road, Aguo, Oyo State, Nigeria",
+    "parsed": {
+      "street": "oyo road",
+      "city": "aguo",
+      "state": "oyo state",
+      "country": "nigeria",
+      "expected_type": "street"
+    }
+  }
+}
