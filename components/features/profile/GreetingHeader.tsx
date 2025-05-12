@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ImageSourcePropType } from 'react-native';
-import { router } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ImageSourcePropType, Platform } from 'react-native';
+import { router, useRouter } from 'expo-router';
+import * as Localization from 'expo-localization';
 
 import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
 import { Web3Avatar } from '../../ui/Avatar';
@@ -21,12 +22,42 @@ export default function GreetingHeader({
   // Get real wallet address using our hook
   const walletAddress = useUserWalletAddress();
 
-  // Get current time to determine greeting
+  // Get current time to determine greeting based on user's timezone
   const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
+    try {
+      const calendars = Localization.getCalendars();
+      const timeZone = calendars?.[0]?.timeZone || undefined;
+      const now = new Date();
+
+      const formatter = new Intl.DateTimeFormat(undefined, {
+        hour: 'numeric',
+        hour12: false,
+        timeZone: timeZone,
+      });
+
+      const hourString = formatter.format(now);
+      const hour = parseInt(hourString, 10);
+
+      console.log(`[GreetingHeader] Detected Timezone: ${timeZone}, Current Hour: ${hour}`);
+
+      if (isNaN(hour)) {
+        console.warn('[GreetingHeader] Failed to parse hour from Intl.DateTimeFormat.');
+        const fallbackHour = new Date().getHours();
+        if (fallbackHour < 12) return 'Good morning';
+        if (fallbackHour < 18) return 'Good afternoon';
+        return 'Good evening';
+      }
+
+      if (hour < 12) return 'Good morning';
+      if (hour < 18) return 'Good afternoon';
+      return 'Good evening';
+    } catch (error) {
+      console.error('[GreetingHeader] Error getting localized greeting:', error);
+      const fallbackHour = new Date().getHours();
+      if (fallbackHour < 12) return 'Good morning';
+      if (fallbackHour < 18) return 'Good afternoon';
+      return 'Good evening';
+    }
   };
 
   // Handle profile navigation

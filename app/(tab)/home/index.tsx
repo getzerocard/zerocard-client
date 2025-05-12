@@ -341,7 +341,7 @@ export default function HomeScreen() {
         <CryptoDepositModal />
 
         {/* Fixed Header */}
-        <View style={[styles.fixedHeader, { paddingTop: Platform.OS === 'ios' ? insets.top - 24 : StatusBar.currentHeight ? StatusBar.currentHeight - 20 : insets.top - 24 }]}>
+        <View style={[styles.fixedHeader, { paddingTop: Platform.OS === 'ios' ? insets.top - 30 : StatusBar.currentHeight ? StatusBar.currentHeight - 24 : insets.top - 24 }]}>
           <GreetingHeader
             username={displayName}
             profileImage={profileIcon}
@@ -433,6 +433,15 @@ export default function HomeScreen() {
             >
               <Ionicons name="card-outline" size={20} color="#FFFFFF" />
               <Text style={styles.simulationButtonText}>Simulate Order Card Flow</Text>
+            </TouchableOpacity>
+            
+            {/* Spending Limit Simulation Button */}
+            <TouchableOpacity
+              style={[styles.simulationButton, { marginTop: 12, backgroundColor: '#33CD00' }]}
+              onPress={handleSpendingLimitPress}
+            >
+              <Ionicons name="cash-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.simulationButtonText}>Simulate Spending Limit</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

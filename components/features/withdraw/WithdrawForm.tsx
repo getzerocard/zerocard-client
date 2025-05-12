@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
   ViewStyle,
+  Alert,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { router } from 'expo-router';
@@ -17,6 +18,9 @@ import { Button } from '../../ui/Button';
 import { useBasenameResolver } from '../../../common/hooks/useBasenameResolver';
 import * as Clipboard from 'expo-clipboard';
 import { isValidAddress, isBasenameWithSuffix } from '../../../common/utils/basenameResolver';
+import { useProcessWithdrawal } from '../../../common/hooks/useProcessWithdrawal';
+import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner';
+import { useUserBalance } from '../../../common/hooks/useUserBalance';
 
 // Import SVG icons as strings
 const usdcIconSvg = `<svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -64,6 +68,27 @@ const WithdrawForm = () => {
     reset: resetBasenameResolver,
   } = useBasenameResolver({ debounceMs: 500 });
 
+  // Use the withdrawal mutation hook
+  const {
+    mutate: processWithdrawal,
+    isPending: isProcessingWithdrawal,
+    error: withdrawalError,
+  } = useProcessWithdrawal();
+
+  // Fetch user balance
+  const {
+    balances,
+    isLoading: isLoadingBalance,
+    error: balanceError
+  } = useUserBalance({
+    symbols: 'USDC',
+    chainType: 'ethereum',
+    blockchainNetwork: 'Base Sepolia'
+  });
+
+  // Get USDC balance from balances object - properly handle the nested structure
+  const availableWithdrawalAmount = Number(balances?.USDC?.['Base Sepolia'] ?? 0);
+
   // When resolution fails, trigger error haptic and log the failure
   useEffect(() => {
     if (addressStatus === 'not_found') {
@@ -76,8 +101,6 @@ const WithdrawForm = () => {
       console.log('Basename resolved successfully:', { basename: addressInput, resolvedAddress });
     }
   }, [addressStatus, addressInput, resolvedAddress]);
-
-  const availableWithdrawalAmount = 20; // Hardcoded for now
 
   const handleAddressChange = (text: string) => {
     setAddressInput(text);
@@ -191,12 +214,79 @@ const WithdrawForm = () => {
   };
   // --- ---
 
+  const handleProcessWithdrawal = () => {
+    const finalAddress = resolvedAddress || (isValidAddress(addressInput) ? addressInput : '');
+    const numericAmount = parseFloat(amountInput);
+
+    if (!finalAddress) {
+      Alert.alert('Error', 'Please enter a valid address or basename.');
+      return;
+    }
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      Alert.alert('Error', 'Please enter a valid withdrawal amount.');
+      return;
+    }
+    if (isAmountError) {
+      Alert.alert('Error', 'Withdrawal amount cannot exceed available balance.');
+      return;
+    }
+
+    const params = {
+      tokenSymbol: 'USDC' as const,
+      amount: amountInput, // API expects string
+      recipientAddress: finalAddress,
+      chainType: 'ethereum' as const,
+      blockchainNetwork: 'Base Sepolia', // Using Base Sepolia
+    };
+
+    console.log('Processing withdrawal with params:', params);
+    processWithdrawal(params, {
+      onSuccess: (data) => {
+        console.log('Withdrawal successful:', data);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          'Success',
+          `Withdrawal of ${data.data.amount} ${data.data.tokenSymbol} to ${truncateAddress(data.data.to)} initiated.\nTransaction Hash: ${truncateAddress(data.data.transactionHash)}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate back or to a confirmation screen
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace('/(tab)/home');
+                }
+              },
+            },
+          ]
+        );
+      },
+      onError: (error: any) => {
+        console.error('Withdrawal failed:', error);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        
+        // Handle specific error cases
+        let errorMessage = 'An unexpected error occurred.';
+        if (error.response?.status === 400) {
+          errorMessage = error.response?.data?.message || 'Invalid input or insufficient balance.';
+        } else if (error.response?.status === 401) {
+          errorMessage = 'Unauthorized. Please log in again.';
+        } else if (error.response?.status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        }
+        
+        Alert.alert('Withdrawal Failed', errorMessage);
+      },
+    });
+  };
+
   return (
     <View style={styles.outerContainer}>
       {/* Header Row */}
       <View style={styles.headerRow}>
         <Text style={styles.title}>Withdraw funds</Text>
-        <TouchableOpacity onPress={handleClose}>
+        <TouchableOpacity onPress={handleClose} disabled={isProcessingWithdrawal}>
           <SvgXml xml={closeIconSvg} width={24} height={24} />
         </TouchableOpacity>
       </View>
@@ -221,8 +311,9 @@ const WithdrawForm = () => {
               onChangeText={handleAddressChange}
               autoCapitalize="none"
               autoCorrect={false}
+              editable={!isProcessingWithdrawal}
             />
-            <TouchableOpacity style={styles.innerButton} onPress={handlePaste}>
+            <TouchableOpacity style={styles.innerButton} onPress={handlePaste} disabled={isProcessingWithdrawal}>
               <Text style={styles.innerButtonText}>Paste</Text>
             </TouchableOpacity>
           </SquircleView>
@@ -239,7 +330,7 @@ const WithdrawForm = () => {
                fillColor: '#333333',
             }}
           >
-            <TouchableOpacity style={styles.innerButton}>
+            <TouchableOpacity style={styles.innerButton} disabled={isProcessingWithdrawal}>
                <SvgXml xml={usdcIconSvg} width={16} height={16} />
                <Text style={styles.innerButtonText}>USDC</Text>
             </TouchableOpacity>
@@ -250,6 +341,7 @@ const WithdrawForm = () => {
               keyboardType="decimal-pad"
               value={formatDisplayAmount(amountInput)}
               onChangeText={handleAmountChange}
+              editable={!isProcessingWithdrawal}
             />
           </SquircleView>
         </View>
@@ -257,7 +349,11 @@ const WithdrawForm = () => {
         {/* Available Amount Row */}
         <View style={styles.availableAmountRow}>
           <Text style={styles.availableAmountText}>Amount you can withdraw</Text>
-          <Text style={styles.availableAmountText}>{availableWithdrawalAmount} USDC</Text> 
+          {isLoadingBalance ? (
+            <ActivityIndicator size="small" color="#919191" />
+          ) : (
+            <Text style={styles.availableAmountText}>{availableWithdrawalAmount} USDC</Text>
+          )}
         </View>
       </View>
       
@@ -265,15 +361,19 @@ const WithdrawForm = () => {
        <Button
             title="Withdraw" // Title is overridden by children, but good for accessibility
             variant="primary" // Assuming primary style from Button.tsx
-            onPress={handleProceedToConfirmation} // Navigate on press
+            onPress={handleProcessWithdrawal} // Navigate on press
             style={styles.withdrawButton} // Apply specific styles
-            disabled={isAmountError || !amountInput || (addressStatus !== 'found' && addressStatus !== 'direct_address')} // Example disable logic
+            disabled={isProcessingWithdrawal || isAmountError || !amountInput || (addressStatus !== 'found' && addressStatus !== 'direct_address')} // Example disable logic
        >
             {/* Custom content for the button with padlock */}
-            <View style={styles.buttonContent}>
-                <SvgXml xml={padlockSvg} width={16} height={16} />
-                <Text style={styles.withdrawButtonText}>Withdraw</Text>
-            </View>
+            {isProcessingWithdrawal ? (
+                <LoadingSpinner size="small" color="#000000" />
+            ) : (
+                <View style={styles.buttonContent}>
+                    <SvgXml xml={padlockSvg} width={16} height={16} />
+                    <Text style={styles.withdrawButtonText}>Withdraw</Text>
+                </View>
+            )}
        </Button>
     </View>
   );
@@ -418,6 +518,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 16,
     paddingVertical: 0,
+    justifyContent: 'center', // For spinner
+    alignItems: 'center', // For spinner
   },
   buttonContent: { 
     flexDirection: 'row',
@@ -431,7 +533,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 17,
     textAlign: 'center',
-    color: '#000000',
+    color: '#000000', // Text color for primary button
   },
 });
 

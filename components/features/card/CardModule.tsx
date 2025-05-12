@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Alert, Clipboard, ViewStyle } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
+import { useUserBalance } from '../../../common/hooks/useUserBalance';
 import { SkeletonLoader } from '../../ui/feedback/SkeletonLoader';
 
 // Import SVG assets as strings
@@ -96,12 +97,6 @@ const copyIconSvg = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"
 
 interface CardModuleProps {
   /**
-   * Card balance amount in USDC
-   * @default 100
-   */
-  balance?: number;
-  
-  /**
    * Custom style for the card container
    */
   style?: ViewStyle;
@@ -113,13 +108,25 @@ interface CardModuleProps {
 }
 
 const CardModule: React.FC<CardModuleProps> = ({ 
-  balance = 100,
   style,
   onCardPress
 }) => {
   // Get wallet address from hook
   const walletAddress = useUserWalletAddress();
-  const isLoading = !walletAddress;
+  const isAddressLoading = !walletAddress;
+
+  // Get balance using useUserBalance hook
+  const {
+    balances,
+    isLoading: isBalanceLoading
+  } = useUserBalance({
+    symbols: 'USDC',
+    chainType: 'ethereum',
+    blockchainNetwork: 'Base Sepolia'
+  });
+
+  // Get USDC balance from balances object
+  const balance = Number(balances?.USDC?.['Base Sepolia'] ?? 0);
   
   // Format address for display (truncated)
   const displayedWalletAddress = React.useMemo(() => {
@@ -157,7 +164,16 @@ const CardModule: React.FC<CardModuleProps> = ({
           <Text style={styles.balanceLabel}>Your card balance is</Text>
           <View style={styles.amountRow}>
             <SvgXml xml={usdcIconSvg} width={20} height={20} />
-            <Text style={styles.amountText}>{balance} USDC</Text>
+            {isBalanceLoading ? (
+              <SkeletonLoader 
+                width={80} 
+                height={24} 
+                borderRadius={8}
+                backgroundColor="rgba(255, 255, 255, 0.2)"
+              />
+            ) : (
+              <Text style={styles.amountText}>{balance} USDC</Text>
+            )}
           </View>
         </View>
 
@@ -167,9 +183,9 @@ const CardModule: React.FC<CardModuleProps> = ({
             <TouchableOpacity 
               onPress={handleCopyAddress} 
               style={styles.addressContentRow}
-              disabled={isLoading}
+              disabled={isAddressLoading}
             >
-              {isLoading ? (
+              {isAddressLoading ? (
                 <SkeletonLoader 
                   width={80} 
                   height={16} 

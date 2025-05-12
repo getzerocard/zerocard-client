@@ -315,11 +315,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
   },
   modalAnimatedContainer: {
     position: 'absolute',
     top: 496,
     width: 354,
+    zIndex: 1500,
   },
   modalContainer: {
     padding: 0,
