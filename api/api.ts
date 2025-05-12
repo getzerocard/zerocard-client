@@ -19,11 +19,13 @@ export function useApiService() {
     if (useIdentityTokenFlag && getIdentityToken) {
       const idToken = await getIdentityToken();
       if (idToken) headers.set('x-identity-token', idToken);
+      console.log('Identity Token:', idToken);
     }
 
     if (useAccessTokenFlag && getAccessToken) {
       const accessToken = await getAccessToken();
       if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+      console.log('Access Token:', accessToken);
     }
 
     const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;

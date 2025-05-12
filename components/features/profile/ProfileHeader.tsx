@@ -8,7 +8,7 @@ import { SkeletonLoader } from '../../ui/feedback/SkeletonLoader';
 import Web3Avatar from '../../ui/Avatar/Web3Avatar';
 
 // Import mockdata for user profile info - only for username now
-import mockData from '../../../assets/mockdata.json';
+// import mockData from '../../../assets/mockdata.json'; // Remove this, username comes from props
 
 // Import the edit icon SVG - simplified without unsupported filters
 const editIconSvg = `<svg width="27" height="26" viewBox="0 0 27 26" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -27,10 +27,7 @@ const copyIconSvg = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"
 </svg>`;
 
 interface ProfileHeaderProps {
-  /**
-   * Custom username override
-   */
-  usernameOverride?: string;
+  username?: string;
   
   /**
    * Callback when edit profile image is pressed
@@ -44,13 +41,12 @@ interface ProfileHeaderProps {
 }
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
-  usernameOverride,
+  username,
   onEditProfileImage,
   onWalletAddressCopy
 }) => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const { username } = mockData.user;
-  const displayUsername = usernameOverride || username;
+  const displayUsername = username || 'User';
   
   // Use our wallet address hook to get the real wallet address
   const walletAddress = useUserWalletAddress();

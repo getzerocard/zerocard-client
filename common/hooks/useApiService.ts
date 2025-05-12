@@ -33,11 +33,10 @@ export function useApiService() {
       headers,
     };
 
+    console.log('Request URL:', url);
+    console.log('Request Options:', JSON.stringify(requestOptions, null, 2));
+
     const response = await fetch(url, requestOptions);
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
-    }
     return response;
   };
 

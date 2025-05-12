@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SvgXml } from 'react-native-svg';
 import SpendingLimitInput from '../../../components/features/spending/SpendingLimitInput'; // Import the new component
 
@@ -12,18 +12,31 @@ const backArrowIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="
 
 export default function SpendingLimitScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ backPath?: string }>(); // Get local search params
   const [currentLimit, setCurrentLimit] = useState(1000); // Mock current limit
   const [userBalance, setUserBalance] = useState(2500); // Mock user balance
 
   const handleBack = () => {
+    if (params.backPath) {
+      router.navigate(params.backPath as any);
+    } else if (router.canGoBack()) {
     router.back();
+    } else {
+      // Fallback if no backPath and cannot go back (e.g., deep link)
+      router.navigate("/");
+    }
   };
 
   const handleSetNewLimit = (newLimit: number) => {
     console.log(`New spending limit set: ${newLimit}`);
-    // Here you would typically call an API to update the limit
-    // For now, we'll just navigate back
+    // Navigate back using the same logic as handleBack
+    if (params.backPath) {
+      router.navigate(params.backPath as any);
+    } else if (router.canGoBack()) {
     router.back();
+    } else {
+      router.navigate("/");
+    }
   };
 
   return (
