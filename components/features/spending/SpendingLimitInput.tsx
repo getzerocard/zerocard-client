@@ -10,10 +10,13 @@ import {
   Animated,
   Pressable,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import { useSetSpendingLimit } from '../../../common/hooks'; // Adjusted import path
 import { Button } from '../../ui/Button';
+import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner'; // Import LoadingSpinner
 
 // Enable layout animations on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -86,6 +89,9 @@ export default function SpendingLimitInput({
   const prevAmountRef = useRef(amountString);
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   const isRemovingDigit = useRef(false);
+
+  // Use the mutation hook
+  const { mutate: setLimit, isPending: isSettingLimit, error: setError } = useSetSpendingLimit();
 
   // Format with commas but preserve decimal
   const formattedDisplay = formatWithCommas(amountString);
@@ -273,94 +279,122 @@ export default function SpendingLimitInput({
     if (isRemovingDigit.current) {
       isRemovingDigit.current = false;
 
-      if (newFormattedDigits.length < oldDigits.length) {
-        // Keep track of which oldDigit indexes we've used
-        const usedOldIndexes = new Set<number>();
+      // Create a map of old characters for quick lookup
+      const oldCharMap = new Map(oldDigits.map((d, i) => [d.key, { ...d, index: i }]));
+      let lastOldIndex = -1;
 
-        // First, add all digits that remain unchanged
-        newFormattedDigits.forEach((char, index) => {
-          // Find matching old digit (preferably at the same index)
-          let oldIndex = index;
+      // Determine which digits are staying and which are leaving
+      const stayingDigits: AnimatedDigit[] = [];
+      const leavingKeys = new Set(oldCharMap.keys());
 
-          // If this is a static character or the value matches, use the old digit
-          if (
-            index < oldDigits.length &&
-            (char === oldDigits[index].value || char === '.' || char === ',')
-          ) {
-            newAnimatedDigits.push(oldDigits[index]);
-            usedOldIndexes.add(index);
-          } else {
-            // This is a new or changed digit
-            const opacity = new Animated.Value(1);
-            const translateY = new Animated.Value(0);
-            const translateX = new Animated.Value(0);
-
-            newAnimatedDigits.push({
-              value: char,
-              key: `digit-${index}-${char}-${Date.now()}`,
-              animValue: new Animated.Value(0),
-              opacity,
-              translateY,
-              translateX,
-              isNew: false,
-            });
-          }
-        });
-
-        // Now animate out the digits that were removed
-        for (let i = 0; i < oldDigits.length; i++) {
-          if (!usedOldIndexes.has(i) && i >= newFormattedDigits.length) {
-            const removedDigit = oldDigits[i];
-
-            // Animate out to the left
-            Animated.parallel([
-              Animated.spring(removedDigit.translateX, {
-                toValue: -50,
-                friction: 8,
-                tension: 10,
-                useNativeDriver: true,
-              }),
-              Animated.timing(removedDigit.opacity, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-            ]).start();
+      newFormattedDigits.forEach((char, newIndex) => {
+        // Try to find a matching character in the old digits
+        let foundMatch = false;
+        for (const [key, oldDigit] of oldCharMap.entries()) {
+          if (oldDigit.value === char && oldDigit.index > lastOldIndex) {
+            stayingDigits.push(oldDigit); // Keep the existing animated digit
+            leavingKeys.delete(key); // Mark as staying
+            lastOldIndex = oldDigit.index;
+            foundMatch = true;
+            break;
           }
         }
 
-        setAnimatedDigits(newAnimatedDigits);
-        prevAmountRef.current = amountString;
-        return;
-      }
+        // If no match found, it's technically a new char in this position
+        // (even if value is same but position shifted due to comma/decimal removal)
+        if (!foundMatch) {
+             const isStatic = char === '.' || char === ',';
+             const opacity = new Animated.Value(1); // Assume it should be visible
+             const translateY = new Animated.Value(0);
+             const translateX = new Animated.Value(0);
+
+             stayingDigits.push({
+                value: char,
+                key: `digit-${newIndex}-${char}-${Date.now()}`,
+                animValue: new Animated.Value(0),
+                opacity,
+                translateY,
+                translateX,
+                isNew: false, // Treat as existing for animation purposes
+             });
+        }
+      });
+
+      // Animate out the leaving digits
+      leavingKeys.forEach(key => {
+         const leavingDigit = oldCharMap.get(key);
+         if (leavingDigit) {
+             Animated.parallel([
+                 Animated.spring(leavingDigit.translateX, {
+                     toValue: 50, // Animate out to the right
+                     friction: 8,
+                     tension: 10,
+                     useNativeDriver: true,
+                 }),
+                 Animated.timing(leavingDigit.opacity, {
+                     toValue: 0,
+                     duration: 200,
+                     useNativeDriver: true,
+                 }),
+             ]).start();
+         }
+      });
+
+      // Update the state after a short delay to allow animations to start
+      setTimeout(() => {
+        setAnimatedDigits(stayingDigits);
+      }, 50);
+
+      prevAmountRef.current = amountString;
+      return;
     }
 
-    // Handle normal case where we're adding digits
-    if (newFormattedDigits.length >= oldDigits.length) {
-      // Adding digits or same length but different values
+    // Handle normal case where we're adding digits or changing value (not adding/removing length)
+    if (newFormattedDigits.length === oldDigits.length) {
+        const updatedDigits = newFormattedDigits.map((char, index) => {
+            if (index < oldDigits.length && oldDigits[index].value === char) {
+                return oldDigits[index]; // Keep existing digit if value is same
+            } else {
+                 // Value changed, create new object but without animation
+                 const isStatic = char === '.' || char === ',';
+                 const opacity = new Animated.Value(1);
+                 const translateY = new Animated.Value(0);
+                 const translateX = new Animated.Value(0);
+                 return {
+                    value: char,
+                    key: `digit-${index}-${char}-${Date.now()}`,
+                    animValue: new Animated.Value(0),
+                    opacity,
+                    translateY,
+                    translateX,
+                    isNew: false,
+                 };
+            }
+        });
+        setAnimatedDigits(updatedDigits);
+    } else if (newFormattedDigits.length > oldDigits.length) {
+      // Adding digits
+      const addedDigits: AnimatedDigit[] = [];
       newFormattedDigits.forEach((char, index) => {
         const isStatic = char === '.' || char === ',';
-
-        // If we have an existing digit at this position
         if (index < oldDigits.length) {
-          // If the digit is the same, keep it
-          if (oldDigits[index].value === char) {
-            newAnimatedDigits.push(oldDigits[index]);
+          // Existing position
+          if(oldDigits[index].value === char) {
+             addedDigits.push(oldDigits[index]); // Keep if same
           } else {
-            // Create a new animated digit with immediately visible values
-            const opacity = new Animated.Value(1);
-            const translateY = new Animated.Value(0);
-            const translateX = new Animated.Value(0);
-
-            newAnimatedDigits.push({
-              value: char,
-              key: `digit-${index}-${char}-${Date.now()}`,
-              animValue: new Animated.Value(0),
-              opacity,
-              translateY,
-              translateX,
-              isNew: false,
-            });
+             // Value changed at existing position - replace without animation
+             const opacity = new Animated.Value(1);
+             const translateY = new Animated.Value(0);
+             const translateX = new Animated.Value(0);
+             addedDigits.push({
+                 value: char,
+                 key: `digit-${index}-${char}-${Date.now()}`,
+                 animValue: new Animated.Value(0),
+                 opacity,
+                 translateY,
+                 translateX,
+                 isNew: false,
+             });
           }
         } else {
           // This is a completely new digit - animate it in from bottom
@@ -368,7 +402,6 @@ export default function SpendingLimitInput({
           const translateY = new Animated.Value(isStatic ? 0 : 30);
           const translateX = new Animated.Value(0);
 
-          // Only animate if it's not a static character
           if (!isStatic) {
             Animated.parallel([
               Animated.spring(translateY, {
@@ -376,16 +409,18 @@ export default function SpendingLimitInput({
                 friction: 8,
                 tension: 10,
                 useNativeDriver: true,
+                delay: (index - oldDigits.length) * 50, // Stagger new digits
               }),
               Animated.timing(opacity, {
                 toValue: 1,
                 duration: 300,
                 useNativeDriver: true,
+                delay: (index - oldDigits.length) * 50,
               }),
             ]).start();
           }
 
-          newAnimatedDigits.push({
+          addedDigits.push({
             value: char,
             key: `digit-${index}-${char}-${Date.now()}`,
             animValue: new Animated.Value(0),
@@ -396,8 +431,7 @@ export default function SpendingLimitInput({
           });
         }
       });
-
-      setAnimatedDigits(newAnimatedDigits);
+      setAnimatedDigits(addedDigits);
     }
 
     prevAmountRef.current = amountString;
@@ -520,18 +554,44 @@ export default function SpendingLimitInput({
   };
 
   const handleSetLimit = () => {
-    if (isExceedingBalance) {
+    const limitValue = parseFloat(amountString) || 0;
+
+    if (isExceedingBalance || limitValue <= 0) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      // Shake the amount display when trying to set a limit that exceeds balance
       shakeDisplay();
+      console.log('Cannot set limit: Exceeds balance or is zero.');
       return;
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const limitValue = parseFloat(amountString) || 0;
-    if (limitValue > 0) {
-      onSetLimit(limitValue);
-    }
+
+    // Prepare parameters for the API call
+    // TODO: Replace hardcoded values with dynamic ones from user context/selection
+    const params = {
+      usdAmount: limitValue,
+      chainType: 'ethereum' as const, // Example value
+      tokenSymbol: 'USDC' as const, // Example value
+      blockchainNetwork: 'Base', // Example value
+    };
+
+    console.log('Calling setLimit mutation with params:', params);
+    setLimit(params, {
+       onSuccess: (data) => {
+         console.log('Successfully set limit via API', data);
+         // Optional: Call original onSetLimit prop if needed for other component logic
+         if (onSetLimit) {
+           onSetLimit(limitValue);
+         }
+         // Navigation or further actions can happen here
+       },
+       onError: (error) => {
+         console.error('Failed to set limit via API', error);
+         // Show user feedback based on the error
+         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+         shakeDisplay(); // Shake on API error too
+         // TODO: Display a user-friendly error message based on setError content
+       }
+    });
   };
 
   const displayAmount = parseFloat(amountString) || 0;
@@ -577,7 +637,7 @@ export default function SpendingLimitInput({
       <Animated.View
         style={[styles.amountDisplayContainer, { transform: [{ translateX: shakeAnimation }] }]}>
         <View style={styles.digitContainer}>
-          {animatedDigits.map((digit, index) => (
+          {animatedDigits.map((digit) => (
             <AnimatedDigit
               key={digit.key}
               digit={digit}
@@ -589,6 +649,9 @@ export default function SpendingLimitInput({
           )}
         </View>
         <Text style={styles.nairaEquivalent}>{formattedNaira}</Text>
+        {setError && (
+           <Text style={styles.errorText}>Error: {setError.message}</Text>
+        )}
       </Animated.View>
 
       <View style={styles.percentageButtonsContainer}>
@@ -622,7 +685,8 @@ export default function SpendingLimitInput({
                   onPressOut={keyAnim.onPressOut}
                   onPress={() => (key === 'back' ? handleBackspace() : handleKeyPress(key))}
                   onLongPress={key === 'back' ? handleLongPressBackspace : undefined}
-                  delayLongPress={500}>
+                  delayLongPress={500}
+                  disabled={isSettingLimit}>
                   <Animated.View style={{ transform: [{ scale: keyAnim.scale }] }}>
                     {key === 'back' ? (
                       <SvgXml xml={backArrowIconSvg} width={24} height={24} />
@@ -638,11 +702,12 @@ export default function SpendingLimitInput({
       </View>
 
       <Button
-        title="Set Limit"
+        title={isSettingLimit ? '' : 'Set Limit'}
         onPress={handleSetLimit}
         style={styles.setLimitButton}
-        disabled={isZero || isExceedingBalance}
-      />
+        disabled={isZero || isExceedingBalance || isSettingLimit}>
+        {isSettingLimit && <LoadingSpinner size="small" color="#FFFFFF" />}
+      </Button>
     </View>
   );
 }
@@ -792,8 +857,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#FAFAFA',
   },
+  errorText: {
+    color: 'red',
+    marginTop: 5,
+    textAlign: 'center',
+    fontSize: 14,
+  },
   setLimitButton: {
-    marginTop: 36, // Push button to the bottom
-    width: '100%', // Take full width
+    marginTop: 36,
+    width: '100%',
+    minHeight: 50, // Ensure button has height even when title is empty
+    justifyContent: 'center', // Center spinner vertically
+    alignItems: 'center', // Center spinner horizontally
   },
 });

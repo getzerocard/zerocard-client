@@ -100,8 +100,8 @@ const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelec
   const handleSelectPhysicalCard = () => {
     onSelectCardType('physical');
     onClose();
-    // Navigate to order-card page with correct path
-    router.push('/home/order-card');
+    // Navigate to the correct card ordering page
+    router.push('/card-ordering');
   };
 
   // Return null on Android
@@ -205,11 +205,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000, // Ensure overlay is below modal content
   },
   modalAnimatedContainer: {
     position: 'absolute',
     top: 422, // Positioning as specified in design
     width: 354,
+    zIndex: 1500, // Ensure modal content is above the overlay
   },
   modalContainer: {
     width: '100%',

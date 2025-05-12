@@ -1,6 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import * as React from 'react';
+
+import { useCheckUsername } from './hooks/useCheckUsername';
 import {
   View,
   Text,
@@ -19,10 +22,11 @@ import { SquircleView } from 'react-native-figma-squircle';
 import BlurBackground from '../../ui/layout/BlurBackground';
 import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner';
 
+
 interface UsernameModalProps {
   visible: boolean;
   onClose: () => void;
-  onSetUsername: (username: string) => void;
+  onSubmit: (username: string) => Promise<void>;
   initialUsername?: string;
 }
 
@@ -31,12 +35,13 @@ type ValidationStatus = 'empty' | 'checking' | 'available' | 'taken';
 const UsernameModal: React.FC<UsernameModalProps> = ({
   visible,
   onClose,
-  onSetUsername,
+  onSubmit,
   initialUsername = '',
 }) => {
   const [username, setUsername] = React.useState(initialUsername);
   const [status, setStatus] = React.useState<ValidationStatus>('empty');
   const [isKeyboardVisible, setKeyboardVisible] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
   const [hasSetUsername, setHasSetUsername] = React.useState(false);
 
   const opacity = React.useRef(new Animated.Value(0)).current;
@@ -49,6 +54,7 @@ const UsernameModal: React.FC<UsernameModalProps> = ({
     if (visible) {
       setHasSetUsername(false);
     }
+    console.log('[UsernameModal] Visibility changed. New visible state:', visible);
   }, [visible]);
 
   // Handle animation when visibility changes
@@ -89,6 +95,7 @@ const UsernameModal: React.FC<UsernameModalProps> = ({
   // Handle keyboard show/hide
   React.useEffect(() => {
     const keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', () => {
+      console.log('[UsernameModal] keyboardWillShow event');
       setKeyboardVisible(true);
       Animated.timing(modalPosition, {
         toValue: -150, // Move modal up by 150 pixels
@@ -98,6 +105,7 @@ const UsernameModal: React.FC<UsernameModalProps> = ({
       }).start();
     });
     const keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', () => {
+      console.log('[UsernameModal] keyboardWillHide event');
       setKeyboardVisible(false);
       Animated.timing(modalPosition, {
         toValue: 0,
@@ -113,56 +121,60 @@ const UsernameModal: React.FC<UsernameModalProps> = ({
     };
   }, [modalPosition]);
 
-  // Simulated username validation
+  // Use the username validation hook
+  const { status: validationStatus, error: validationError } = useCheckUsername(username);
+
+  // Update status based on validation results
   React.useEffect(() => {
-    if (username.length === 0) {
-      setStatus('empty');
-      return;
+    setStatus(validationStatus);
+    if (validationStatus === 'taken') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } else if (validationStatus === 'available') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-
-    // Simulate checking status with a timeout
-    setStatus('checking');
-    const timer = setTimeout(() => {
-      // Simulate API validation - just for demo
-      // In a real app, you would make an API call to check username availability
-      if (username === 'folajindayo') {
-        setStatus('taken');
-        // Trigger error haptic feedback for taken username
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      } else {
-        setStatus('available');
-        // Trigger success haptic feedback for available username
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [username]);
+  }, [validationStatus]);
 
   // Modified close handler to prevent closing if username not set
   const handleClose = () => {
+    console.log('[UsernameModal] handleClose called. hasSetUsername:', hasSetUsername);
     if (hasSetUsername) {
+      console.log('[UsernameModal] Username has been set. Calling onClose.');
       Keyboard.dismiss();
       onClose();
     } else {
+      console.log('[UsernameModal] Username not set. Alerting user.');
       Alert.alert('Username Required', 'Please set a username before continuing.', [
         { text: 'OK' },
       ]);
     }
   };
 
-  const handleSetUsername = () => {
+  const handleSetUsername = async () => {
+    console.log('[UsernameModal] handleSetUsername called. Current username:', username, 'Status from validation hook:', validationStatus, 'Local status:', status);
     if (status === 'available' && username.length > 0) {
-      onSetUsername(username);
-      setHasSetUsername(true);
-      onClose();
+      console.log('[UsernameModal] Username available and not empty. Proceeding to set.');
+      setLoading(true);
+      try {
+        console.log('[UsernameModal] Calling onSubmit with username:', username);
+        await onSubmit(username);
+        setHasSetUsername(true);
+        console.log('[UsernameModal] onSubmit successful. Calling onClose.');
+        onClose(); // This will internally call handleClose, which now has the dismiss logic
+      } catch (error) {
+        console.error('Error setting username:', error);
+        Alert.alert('Error', 'Failed to set username. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     } else if (status === 'taken') {
+      console.log('[UsernameModal] Username taken. Alerting user.');
       Alert.alert(
         'Username Not Available',
         'This username is already taken. Please choose another one.',
         [{ text: 'OK' }]
       );
     } else if (status === 'empty' || username.length === 0) {
+      console.log('[UsernameModal] Username empty. Alerting user.');
       Alert.alert('Username Required', 'Please enter a username to continue.', [{ text: 'OK' }]);
     }
   };
@@ -171,7 +183,10 @@ const UsernameModal: React.FC<UsernameModalProps> = ({
     <Modal transparent visible={visible} animationType="none" onRequestClose={handleClose}>
       <BlurBackground visible={visible} intensity={40} tint="dark" />
 
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={handleClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => {
+        console.log('[UsernameModal] modalOverlay onPress triggered.');
+        handleClose();
+      }}>
         <Animated.View
           style={[
             styles.modalAnimatedContainer,
@@ -190,7 +205,10 @@ const UsernameModal: React.FC<UsernameModalProps> = ({
             }}>
             <TouchableOpacity
               activeOpacity={1}
-              onPress={(e) => e.stopPropagation()}
+              onPress={(e) => {
+                console.log('[UsernameModal] modalTouchable onPress triggered (stopPropagation expected).');
+                e.stopPropagation();
+              }}
               style={styles.modalTouchable}>
               <View style={styles.contentWrapper}>
                 <View style={styles.contentContainer}>
@@ -217,9 +235,18 @@ const UsernameModal: React.FC<UsernameModalProps> = ({
                           placeholder="Enter a unique name"
                           placeholderTextColor="#787878"
                           value={username}
-                          onChangeText={setUsername}
-                          onFocus={() => setKeyboardVisible(true)}
-                          onBlur={() => setKeyboardVisible(false)}
+                          onChangeText={(text) => {
+                            console.log('[UsernameModal] TextInput onChangeText. New text:', text);
+                            setUsername(text);
+                          }}
+                          onFocus={() => {
+                            console.log('[UsernameModal] TextInput onFocus.');
+                            setKeyboardVisible(true);
+                          }}
+                          onBlur={() => {
+                            console.log('[UsernameModal] TextInput onBlur.');
+                            setKeyboardVisible(false);
+                          }}
                         />
                       </View>
                     </SquircleView>
@@ -257,10 +284,21 @@ const UsernameModal: React.FC<UsernameModalProps> = ({
                   squircleParams={{
                     cornerSmoothing: 1,
                     cornerRadius: 100000,
-                    fillColor: '#40FF00',
+                    fillColor: loading ? '#A0A0A0' : '#40FF00',
                   }}>
-                  <TouchableOpacity style={styles.button} onPress={handleSetUsername}>
-                    <Text style={styles.buttonText}>Set username</Text>
+                  <TouchableOpacity 
+                    style={styles.button} 
+                    onPress={() => {
+                      console.log('[UsernameModal] Set Username button onPress triggered.');
+                      if (!loading) handleSetUsername();
+                    }}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <LoadingSpinner size="small" color="#000000" style={{ padding: 0 }} />
+                    ) : (
+                      <Text style={styles.buttonText}>Set username</Text>
+                    )}
                   </TouchableOpacity>
                 </SquircleView>
               </View>
@@ -277,11 +315,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
   },
   modalAnimatedContainer: {
     position: 'absolute',
     top: 496,
     width: 354,
+    zIndex: 1500,
   },
   modalContainer: {
     padding: 0,

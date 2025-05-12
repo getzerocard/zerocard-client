@@ -13,7 +13,6 @@ import { AccessTokenProvider } from './(app)/context/accessTokenContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DepositModalProvider } from '../common/hooks/useDepositModal';
-import { UsernameModalProvider } from '../common/hooks/useUsernameModal';
 import { RootSiblingParent } from 'react-native-root-siblings';
 import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from '../providers/UserProvider';
@@ -80,12 +79,10 @@ export default function RootLayout() {
                   <NetworkStatus />
 
                   <DepositModalProvider walletId="">
-                    <UsernameModalProvider>
                       <RootSiblingParent>
                         <AuthGuard />
                         <Slot />
                       </RootSiblingParent>
-                    </UsernameModalProvider>
                   </DepositModalProvider>
                 </CryptoDepositProvider>
                 <PrivyElements />

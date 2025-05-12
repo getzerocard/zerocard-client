@@ -4,6 +4,7 @@ import { SvgXml } from 'react-native-svg';
 import Squircle from 'react-native-squircle';
 import { usePrivy } from '@privy-io/expo';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useSettingsStore } from '../../../store/settingsStore';
 import AccountInfoSection from './AccountInfoSection';
@@ -81,8 +82,106 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   spendingLimitDisplay,
   showSpendingLimit,
 }) => {
-  const { notificationsEnabled } = useSettingsStore();
+  const [biometricsEnabled, setBiometricsEnabled] = useState(true);
+  const userData = mockData.user || {};
+  const privy = usePrivy();
 
+  // Set default values or use values from mockData
+  const username = userData.username || 'Temidayo Folajin';
+  const email = userData.email || 'dayofolajin@gmail.com';
+  const phone = '+44 7563 543 710'; // Default phone number since it's not in mockData
+
+  const handleHelpPress = () => {
+    Linking.openURL('https://www.zerocard.com/help');
+  };
+
+  const handleTermsPress = () => {
+    Linking.openURL('https://www.zerocard.com/terms');
+  };
+
+  const handlePrivacyPress = () => {
+    Linking.openURL('https://www.zerocard.com/privacy');
+  };
+
+  const handleLogout = async () => {
+    console.log('[ProfileSettings] handleLogout initiated.');
+    try {
+      console.log('[ProfileSettings] Attempting to clear user_session from SecureStore...');
+      await SecureStore.deleteItemAsync('user_session');
+      console.log('[ProfileSettings] user_session cleared from SecureStore successfully.');
+
+      console.log('[ProfileSettings] Attempting to clear username from AsyncStorage...');
+      await AsyncStorage.removeItem('username');
+      console.log('[ProfileSettings] username cleared from AsyncStorage successfully.');
+      
+      console.log('[ProfileSettings] Attempting to logout from Privy...');
+      await privy.logout();
+      console.log('[ProfileSettings] Privy logout successful.');
+      
+      console.log('Successfully logged out');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      if (error instanceof Error) {
+        console.error(`[ProfileSettings] Logout error details: ${error.message}`, error.stack);
+      } else {
+        console.error('[ProfileSettings] Logout error details: An unknown error object was thrown.', error);
+      }
+    }
+  };
+
+  const handleCloseAccount = () => {
+    // Handle close account logic
+    console.log('Closing account...');
+  };
+
+  // Settings data
+  const settings = [
+    {
+      id: 'profile',
+      title: 'Profile',
+      icon: profileIconSvg,
+      path: '/(app)/profile/edit',
+    },
+    {
+      id: 'notifications',
+      title: 'Notifications',
+      icon: notificationIconSvg,
+      path: '/(app)/settings/notifications',
+      isToggle: true,
+      isEnabled: notificationsEnabled,
+    },
+    {
+      id: 'privacy',
+      title: 'Privacy',
+      icon: privacyIconSvg,
+      path: '/(app)/settings/privacy',
+    },
+    {
+      id: 'logout',
+      title: 'Logout',
+      icon: logoutIconSvg,
+      isDestructive: true,
+    },
+  ];
+
+  const handleSettingPress = (setting: typeof settings[0]) => {
+    if (setting.id === 'logout') {
+      if (onLogout) {
+        onLogout();
+      } else {
+        console.log('Logout pressed');
+        // Implement logout functionality
+      }
+      return;
+    }
+    
+    if (onSettingPress) {
+      onSettingPress(setting.id);
+    } else if (setting.path) {
+      router.push(setting.path as any);
+    }
+  };
+ 
   return (
     <View style={styles.container}>
       <AccountInfoSection fullName={fullName} email={email} phone={phone} />

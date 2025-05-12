@@ -69,6 +69,17 @@ export function useApiService() {
       });
     },
 
+    patch: (endpoint: string, body: any, options: RequestInit = {}) => {
+      const headers = new Headers(options.headers as HeadersInit || {});
+      headers.set('Content-Type', 'application/json');
+      return fetchWithTokens(endpoint, {
+        ...options,
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(body),
+      });
+    },
+
     delete: (endpoint: string, options: RequestInit = {}) =>
       fetchWithTokens(endpoint, { ...options, method: 'DELETE' }),
   };
