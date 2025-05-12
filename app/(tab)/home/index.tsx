@@ -341,7 +341,7 @@ export default function HomeScreen() {
         <CryptoDepositModal />
 
         {/* Fixed Header */}
-        <View style={[styles.fixedHeader, { paddingTop: Platform.OS === 'ios' ? insets.top : StatusBar.currentHeight ? StatusBar.currentHeight + 4 : insets.top + 4 }]}>
+        <View style={[styles.fixedHeader, { paddingTop: Platform.OS === 'ios' ? insets.top - 24 : StatusBar.currentHeight ? StatusBar.currentHeight - 20 : insets.top - 24 }]}>
           <GreetingHeader
             username={displayName}
             profileImage={profileIcon}

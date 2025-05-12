@@ -53,27 +53,37 @@ export const useUsernameModal = () => {
     }
 
     try {
-      console.log('[useUsernameModal] Making API request to update username', { ...logContext, usernameToSend: currentUsername });
-      await apiService.patch('/users/me', { username: currentUsername });
-
-      console.log('[useUsernameModal] Username updated successfully via API', {
-        ...logContext,
-      });
-
+      // Optimistically update local state
       setStatus('available');
       setError(null);
 
-      try {
-        await AsyncStorage.setItem('username', currentUsername);
-        console.log('[useUsernameModal] Username saved to AsyncStorage', { ...logContext });
-      } catch (storageError) {
-        console.error('[useUsernameModal] Failed to save username to AsyncStorage:', { ...logContext, storageError });
-      }
+      // Start AsyncStorage update in parallel with API call
+      const storagePromise = AsyncStorage.setItem('username', currentUsername)
+        .then(() => {
+          console.log('[useUsernameModal] Username saved to AsyncStorage', { ...logContext });
+        })
+        .catch((storageError) => {
+          console.error('[useUsernameModal] Failed to save username to AsyncStorage:', { ...logContext, storageError });
+        });
 
-      if (refetchCreateUserMutation) {
-        console.log('[useUsernameModal] Calling refetchCreateUserMutation after username set.');
-        refetchCreateUserMutation();
-      }
+      // Start API call
+      const apiPromise = apiService.patch('/users/me', { username: currentUsername })
+        .then(() => {
+          console.log('[useUsernameModal] Username updated successfully via API', { ...logContext });
+        });
+
+      // Start user creation refetch in parallel if available
+      const refetchPromise = refetchCreateUserMutation
+        ? Promise.resolve(refetchCreateUserMutation()).catch((error: Error) => {
+            console.error('[useUsernameModal] Error in refetchCreateUserMutation:', error);
+          })
+        : Promise.resolve();
+
+      // Wait for all operations to complete
+      await Promise.all([storagePromise, apiPromise, refetchPromise]);
+
+      // Close modal after all operations complete successfully
+      handleClose();
 
     } catch (error) {
       const errorDetails = {
@@ -83,11 +93,21 @@ export const useUsernameModal = () => {
       };
 
       console.error('[useUsernameModal] Username update failed:', errorDetails);
+      
+      // Revert optimistic update
       setStatus('taken');
       setError(errorDetails.error);
+      
+      // Clean up AsyncStorage in case of API failure
+      try {
+        await AsyncStorage.removeItem('username');
+      } catch (cleanupError) {
+        console.error('[useUsernameModal] Failed to clean up AsyncStorage after error:', cleanupError);
+      }
+      
       throw error instanceof Error ? error : new Error('An unexpected error occurred during username update');
     }
-  }, [apiService, setStatus, setError, refetchCreateUserMutation]);
+  }, [apiService, setStatus, setError, refetchCreateUserMutation, handleClose]);
 
   const modalProps: CommonModalProps = useMemo(() => ({
     visible: isVisible,
