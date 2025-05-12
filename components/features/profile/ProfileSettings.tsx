@@ -83,13 +83,8 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   showSpendingLimit,
 }) => {
   const [biometricsEnabled, setBiometricsEnabled] = useState(true);
-  const userData = mockData.user || {};
+  const { notificationsEnabled, toggleNotifications } = useSettingsStore();
   const privy = usePrivy();
-
-  // Set default values or use values from mockData
-  const username = userData.username || 'Temidayo Folajin';
-  const email = userData.email || 'dayofolajin@gmail.com';
-  const phone = '+44 7563 543 710'; // Default phone number since it's not in mockData
 
   const handleHelpPress = () => {
     Linking.openURL('https://www.zerocard.com/help');
