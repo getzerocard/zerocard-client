@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function WithdrawalToast({ amount, address, onHide }: Props) {
-  const { width } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const slideAnim = useRef(new Animated.Value(-200)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -54,7 +54,7 @@ export default function WithdrawalToast({ amount, address, onHide }: Props) {
         {
           transform: [{ translateY: slideAnim }],
           opacity,
-          width: width - 40,
+          width: screenWidth - 32,
         },
       ]}
     >
@@ -80,6 +80,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     top: 68,
     zIndex: 999,
+    ...(Platform.OS === 'android' ? { elevation: 10 } : {}),
+    pointerEvents: 'none',
   },
   content: {
     backgroundColor: '#ECECEC',
@@ -88,6 +90,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: 16,
     gap: 8,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+    } : {}),
+    pointerEvents: 'auto',
   },
   iconWrapper: {
     width: 36,

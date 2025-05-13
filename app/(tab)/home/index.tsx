@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   StatusBar,
+  RefreshControl,
 } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +31,8 @@ import TrackingStatusModal from '../../../components/modals/tracking/TrackingSta
 import CryptoDepositModal from '../../../components/modals/crypto-deposit/CryptoDepositModal';
 // Import the hook for CryptoDepositModal
 import { useCryptoDepositListener } from '../../../components/context/CryptoDepositContext'; 
+// Import the transaction hook
+import { useUserTransactions } from '../../../common/hooks/useUserTransactions';
 // Define TrackingStatus type locally as it's defined within modals
 type TrackingStatus = 'accepted' | 'picked_up' | 'on_delivery' | 'delivered';
 
@@ -51,6 +54,11 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   // State for username
   const [username, setUsername] = useState<string>('');
+  // State for user's stage in the onboarding process - MOVED UP before usage
+  const [userStage, setUserStage] = useState<UserStage>('new_user');
+  // State for refresh control - MOVED TO TOP LEVEL
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
   const {
     showLimitToast,
     showWithdrawalToast,
@@ -62,6 +70,33 @@ export default function HomeScreen() {
     amount?: string;
     address?: string;
   }>();
+
+  // Fetch user transactions
+  const { 
+    data: transactions, 
+    isLoading: transactionsLoading, 
+    error: transactionsError, 
+    refetch: refetchTransactions
+  } = useUserTransactions({
+    limit: 5, // Fetch 5 most recent transactions
+    enabled: userStage === 'has_transactions' || userStage === 'activated_card'
+  });
+
+  // Callback function for RefreshControl - MOVED TO TOP LEVEL
+  const onRefresh = useCallback(async () => {
+    console.log('[HomeScreen] Pull to refresh triggered');
+    setIsRefreshing(true);
+    try {
+      // Refetch transactions
+      await refetchTransactions();
+      // Optionally refetch other data like balance here
+      // await refetchUserBalance(); 
+    } catch (error) { 
+      console.error('[HomeScreen] Error during refresh:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetchTransactions]);
 
   // Use the crypto deposit listener hook
   const { handleNewDeposit } = useCryptoDepositListener();
@@ -114,9 +149,6 @@ export default function HomeScreen() {
     logTokens();
   }, [getIdentityToken, getAccessToken]); // Dependencies are stable
   // ---- End Token Logging ----
-
-  // State for user's stage in the onboarding process
-  const [userStage, setUserStage] = useState<UserStage>('new_user');
 
   // Use the username modal hook without explicit show option
   const { 
@@ -275,7 +307,13 @@ export default function HomeScreen() {
   // Render empty transactions state
   const renderEmptyTransactions = () => (
     <View style={styles.emptyTransactionsContainer}>
-      <Text style={styles.emptyTransactionsText}>You have no transactions</Text>
+      {transactionsLoading ? (
+        <Text style={styles.emptyTransactionsText}>Loading transactions...</Text>
+      ) : transactionsError ? (
+        <Text style={styles.emptyTransactionsText}>Failed to load transactions</Text>
+      ) : (
+        <Text style={styles.emptyTransactionsText}>You have no transactions</Text>
+      )}
     </View>
   );
 
@@ -313,15 +351,30 @@ export default function HomeScreen() {
     router.push('/card-ordering');
   };
 
+  // Add a new function to set the userStage to has_transactions
+  const handleSimulateHasTransactions = () => {
+    console.log('Setting userStage to has_transactions');
+    setUserStage('has_transactions');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Toast notifications - Move outside KeyboardAvoidingView to prevent layout shifts */}
+      <SpendingLimitToast visible={toastVisible} onDismiss={() => setToastVisible(false)} />
+      
+      {/* Withdrawal success toast overlay */}
+      {withdrawalToastVisible && toastAmount && toastAddress && (
+        <WithdrawalToast
+          amount={toastAmount as string}
+          address={toastAddress as string}
+          onHide={() => setWithdrawalToastVisible(false)}
+        />
+      )}
+      
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Toast notification */}
-        <SpendingLimitToast visible={toastVisible} onDismiss={() => setToastVisible(false)} />
-
         {/* Card Type Modal (Common) */}
         <CardTypeModal
           visible={cardTypeModalVisible}
@@ -354,6 +407,13 @@ export default function HomeScreen() {
           contentContainerStyle={styles.scrollContentContainer}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              tintColor="#888888"
+            />
+          }
         >
           {/* Card Module */}
           <View style={styles.cardModuleContainer}>
@@ -407,53 +467,46 @@ export default function HomeScreen() {
               </View>
 
               {/* Show transactions or empty state based on user stage */}
-              {userStage === 'has_transactions'
-                ? mockData.transactions.map((transaction) => (
-                    <TransactionItem
-                      key={transaction.id}
-                      id={transaction.id}
-                      type={transaction.amount > 0 ? 'deposit' : 'spend'}
-                      name={transaction.name}
-                      amount={Math.abs(transaction.amount)}
-                      date={transaction.date}
-                      time={transaction.timestamp.split('T')[1].substring(0, 5)}
-                      currency="USDC"
-                      category={transaction.category}
-                    />
-                  ))
-                : renderEmptyTransactions()}
+              {transactions && transactions.length > 0 ? (
+                transactions.map((transaction) => (
+                  <TransactionItem
+                    key={transaction.transactionHash || `tx-${transaction.dateAndTime}`}
+                    transaction={transaction}
+                  />
+                ))
+              ) : renderEmptyTransactions()}
             </View>
           )}
 
-          {/* Simulation Button - For testing the order card flow */}
+          {/* Simulation Buttons - Placed in a horizontal row */}
           <View style={styles.simulationContainer}>
-            <TouchableOpacity
-              style={styles.simulationButton}
-              onPress={handleSimulateOrderCard}
-            >
-              <Ionicons name="card-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.simulationButtonText}>Simulate Order Card Flow</Text>
-            </TouchableOpacity>
-            
-            {/* Spending Limit Simulation Button */}
-            <TouchableOpacity
-              style={[styles.simulationButton, { marginTop: 12, backgroundColor: '#33CD00' }]}
-              onPress={handleSpendingLimitPress}
-            >
-              <Ionicons name="cash-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.simulationButtonText}>Simulate Spending Limit</Text>
-            </TouchableOpacity>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.simulationButtonsRow}>
+              <TouchableOpacity
+                style={styles.simulationButton}
+                onPress={handleSimulateOrderCard}
+              >
+                <Ionicons name="card-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.simulationButtonText}>Card Flow</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.simulationButton, { backgroundColor: '#33CD00' }]}
+                onPress={handleSpendingLimitPress}
+              >
+                <Ionicons name="cash-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.simulationButtonText}>Spending Limit</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.simulationButton, { backgroundColor: '#FF6B00' }]}
+                onPress={handleSimulateHasTransactions}
+              >
+                <Ionicons name="list-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.simulationButtonText}>Show Transactions</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </ScrollView>
-
-        {/* Withdrawal success toast overlay */}
-        {withdrawalToastVisible && toastAmount && toastAddress && (
-          <WithdrawalToast
-            amount={toastAmount as string}
-            address={toastAddress as string}
-            onHide={() => setWithdrawalToastVisible(false)}
-          />
-        )}
 
         {/* Username Modal */}
         {ModalComponent && <ModalComponent {...modalProps} />}
@@ -544,12 +597,18 @@ const styles = StyleSheet.create({
   simulationContainer: {
     marginTop: 16,
     marginBottom: 32,
-    alignItems: 'center',
+    width: '100%',
+  },
+  simulationButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
   },
   simulationButton: {
     backgroundColor: '#2E86FF',
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     borderRadius: 100,
     flexDirection: 'row',
     alignItems: 'center',
@@ -562,6 +621,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    minWidth: 120,
   },
   simulationButtonText: {
     color: '#FFFFFF',

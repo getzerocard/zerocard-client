@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, Platform, useWindowDimensions } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 
@@ -23,12 +23,9 @@ interface SpendingLimitToastProps {
 }
 
 const SpendingLimitToast: React.FC<SpendingLimitToastProps> = ({ visible = true, onDismiss }) => {
-  // Animation values
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-
-  // Window dimensions for positioning
-  const { width } = Dimensions.get('window');
+  const { width: screenWidth } = useWindowDimensions();
 
   // Function to animate the toast in
   const animateIn = () => {
@@ -95,7 +92,7 @@ const SpendingLimitToast: React.FC<SpendingLimitToastProps> = ({ visible = true,
         {
           transform: [{ translateY }],
           opacity,
-          width: width - 40, // 20px margin on each side
+          width: screenWidth - 32,
         },
       ]}>
       <View style={styles.content}>
@@ -120,6 +117,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     zIndex: 1000,
     top: 68,
+    ...(Platform.OS === 'android' ? { elevation: 10 } : {}),
+    pointerEvents: 'none',
   },
   content: {
     flexDirection: 'row',
@@ -128,6 +127,13 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: '#ECECEC',
     borderRadius: 20,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+    } : {}),
+    pointerEvents: 'auto',
   },
   iconContainer: {
     flex: 0,

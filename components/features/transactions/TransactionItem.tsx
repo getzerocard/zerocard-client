@@ -1,30 +1,35 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { SvgXml } from 'react-native-svg';
+import { Transaction } from '../../../types/transactions'; // Import the new Transaction type
+
+// Helper function to format date and time
+const formatDateTime = (isoString: string): { date: string; time: string } => {
+  if (!isoString) return { date: 'N/A', time: 'N/A' };
+  try {
+    const dateObj = new Date(isoString);
+    const date = dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); // e.g., "May 3"
+    const time = dateObj.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }); // e.g., "11:30 PM"
+    return { date, time };
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    return { date: 'Invalid Date', time: 'Invalid Time' };
+  }
+};
 
 // Transaction types
 export type TransactionType = 'deposit' | 'spend' | 'withdraw';
 
 export interface TransactionItemProps {
-  id: string;
-  type: TransactionType;
-  name: string;
-  amount: number;
-  date: string;
-  time?: string;
-  currency?: string;
-  category?: string;
+  transaction: Transaction; // Use the imported Transaction type
 }
 
-export const TransactionItem: React.FC<TransactionItemProps> = ({
-  type,
-  name,
-  amount,
-  date,
-  time = '10:05am',
-  currency = 'USDC',
-  category,
-}) => {
+export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction }) => {
+  const { date, time } = formatDateTime(transaction.dateAndTime);
+  const currency = transaction.tokenInfo?.symbol || 'USDC'; // Assuming tokenInfo might have symbol
+  const usdAmount = parseFloat(transaction.usdAmount);
+  const nairaAmount = parseFloat(transaction.nairaAmount);
+
   // USDC icon SVG
   const usdcSvg = `<svg width="17" height="17" viewBox="0 0 17 17" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M8.50041 16.4288C12.7978 16.4288 16.2546 12.8942 16.2546 8.50001C16.2546 4.10586 12.7978 0.571198 8.50041 0.571198C4.20303 0.571198 0.746216 4.10586 0.746216 8.50001C0.746216 12.8942 4.20303 16.4288 8.50041 16.4288Z" fill="#2775CA"/>
@@ -52,43 +57,50 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
 <path d="M19.293 19.293L19 19.5859V16.1626C19 15.6103 18.5522 15.1626 18 15.1626C17.4477 15.1626 17 15.6103 17 16.1626V19.5859L16.707 19.293C16.3164 18.9023 15.6836 18.9023 15.293 19.293C14.9023 19.6836 14.9023 20.3164 15.293 20.707L17.293 22.707C17.4883 22.9023 17.7441 23 18 23C18.2559 23 18.5117 22.9023 18.707 22.707L20.707 20.707C21.0976 20.3164 21.0976 19.6836 20.707 19.293C20.3164 18.9023 19.6836 18.9023 19.293 19.293Z" fill="black"/>
 </svg>`;
 
-  // Determine UI based on transaction type
+  // Determine UI based on transaction type from API
   let iconSvg;
   let title;
   let amountText;
   let amountTagStyle;
 
-  if (type === 'deposit') {
-    title = `You deposited ${amount} ${currency}`;
-    amountText = `+${amount} ${currency}`;
-    amountTagStyle = styles.depositAmountTag;
-    iconSvg = (
-      <View style={styles.depositIconGroup}>
-        <SvgXml xml={usdcSvg} width={35} height={35} style={styles.usdcIcon} />
-        <View style={styles.receivedIconContainer}>
-          <SvgXml xml={depositIconSvg} width={16} height={16} />
+  switch (transaction.transactionType.toLowerCase()) {
+    case 'deposit': // Assuming 'deposit' will be a value for transactionType
+      title = `You deposited ${usdAmount.toFixed(2)} ${currency}`;
+      amountText = `+${usdAmount.toFixed(2)} ${currency}`;
+      amountTagStyle = styles.depositAmountTag;
+      iconSvg = (
+        <View style={styles.depositIconGroup}>
+          <SvgXml xml={usdcSvg} width={35} height={35} style={styles.usdcIcon} />
+          <View style={styles.receivedIconContainer}>
+            <SvgXml xml={depositIconSvg} width={16} height={16} />
+          </View>
         </View>
-      </View>
-    );
-  } else if (type === 'withdraw') {
-    title = `You withdrew ${amount} ${currency}`;
-    amountText = `-${amount} ${currency}`;
-    amountTagStyle = styles.withdrawAmountTag;
-    iconSvg = (
-      <View style={styles.iconContainer}>
-        <SvgXml xml={withdrawIconSvg} width={36} height={36} />
-      </View>
-    );
-  } else {
-    // spend
-    title = `You spent ${amount} ${currency}`;
-    amountText = `-₦${(amount * 1500).toFixed(2)}`;
-    amountTagStyle = styles.spendAmountTag;
-    iconSvg = (
-      <View style={styles.iconContainer}>
-        <SvgXml xml={spentIconSvg} width={36} height={36} />
-      </View>
-    );
+      );
+      break;
+    case 'withdrawal': // Assuming 'withdrawal' will be a value for transactionType
+      title = `Withdrew ${usdAmount.toFixed(2)} ${currency}`;
+      amountText = `-${usdAmount.toFixed(2)} ${currency}`;
+      amountTagStyle = styles.withdrawAmountTag;
+      iconSvg = (
+        <View style={styles.iconContainer}>
+          <SvgXml xml={withdrawIconSvg} width={36} height={36} />
+        </View>
+      );
+      break;
+    case 'spending':
+    default:
+      // Default to spending if type is not recognized or is 'spending'
+      const merchantName = transaction.merchant?.merchantName || transaction.category || 'Purchase';
+      title = `Spent ${usdAmount.toFixed(2)} ${currency} at ${merchantName}`;
+      // For spending, API provides nairaAmount directly
+      amountText = `-₦${nairaAmount.toFixed(2)}`;
+      amountTagStyle = styles.spendAmountTag;
+      iconSvg = (
+        <View style={styles.iconContainer}>
+          <SvgXml xml={spentIconSvg} width={36} height={36} />
+        </View>
+      );
+      break;
   }
 
   return (
@@ -99,10 +111,12 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
 
         {/* Transaction details */}
         <View style={styles.details}>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+            {title}
+          </Text>
           <View style={styles.metaContainer}>
             <Text style={styles.metaText}>{date}</Text>
-            {time && <Text style={styles.metaText}>{time}</Text>}
+            {time !== 'N/A' && <Text style={styles.metaText}>{time}</Text>}
           </View>
         </View>
       </View>
@@ -126,26 +140,29 @@ const styles = StyleSheet.create({
   leftContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+    flexShrink: 1,
   },
   depositIconGroup: {
     position: 'relative',
     width: 37,
     height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   usdcIcon: {
     position: 'absolute',
-    left: 0,
-    top: 5,
   },
   receivedIconContainer: {
     position: 'absolute',
     width: 16,
     height: 16,
-    left: 21,
-    top: 2,
+    right: -2,
+    bottom: 0,
     backgroundColor: '#FFFFFF',
     borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   iconContainer: {
     width: 36,
@@ -157,51 +174,55 @@ const styles = StyleSheet.create({
   details: {
     flexDirection: 'column',
     alignItems: 'flex-start',
+    flexShrink: 1,
+    maxWidth: '70%',
   },
   title: {
-    fontFamily: 'SF Pro Display',
-    fontStyle: 'normal',
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'sans-serif',
     fontWeight: '500',
     fontSize: 16,
-    lineHeight: 19.2,
+    lineHeight: 19,
     color: '#121212',
   },
   metaContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
+    marginTop: 2,
   },
   metaText: {
-    fontFamily: 'SF Pro Text',
-    fontStyle: 'normal',
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'sans-serif',
     fontWeight: '500',
     fontSize: 14,
-    lineHeight: 23,
+    lineHeight: 17,
     color: '#838383',
   },
   amountTag: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 2,
-    paddingLeft: 8,
-    paddingRight: 8,
-    borderRadius: 10000,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 1000,
     borderWidth: 1,
     borderStyle: 'dashed',
+    minWidth: 80,
+    flexShrink: 0,
   },
   depositAmountTag: {
     borderColor: '#38E100',
+    backgroundColor: 'rgba(56, 225, 0, 0.1)',
   },
   spendAmountTag: {
     borderColor: '#BCBCBC',
+    backgroundColor: 'rgba(188, 188, 188, 0.1)',
   },
   withdrawAmountTag: {
-    borderColor: '#c9252d',
+    borderColor: '#C9252D',
+    backgroundColor: 'rgba(201, 37, 45, 0.1)',
   },
   amountText: {
-    fontFamily: 'SF Pro Text',
-    fontStyle: 'normal',
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'sans-serif',
     fontWeight: '500',
     fontSize: 14,
     lineHeight: 17,
