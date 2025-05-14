@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export interface Merchant {
   merchantName: string | null;
   city: string | null;
@@ -32,4 +34,67 @@ export interface GetTransactionsSuccessResponse {
 
 // Define potential error response structure if needed (can reuse ApiErrorResponse)
 // Example:
-// export interface GetTransactionsErrorResponse extends ApiErrorResponse {} 
+// export interface GetTransactionsErrorResponse extends ApiErrorResponse {}
+
+export const DayOfWeekSchema = z.enum(["S", "M", "T", "W", "T2", "F", "S2"]);
+export type DayOfWeek = z.infer<typeof DayOfWeekSchema>;
+
+export interface ChangeFromLastWeek {
+  percentage: number;
+  isIncrease: boolean;
+}
+
+export const ChangeFromLastWeekSchema = z.object({
+  percentage: z.number(),
+  isIncrease: z.boolean(),
+});
+
+export interface DailySpending {
+  S: number;
+  M: number;
+  T: number;
+  W: number;
+  T2: number; // Assuming T2 is Thursday
+  F: number;
+  S2: number; // Assuming S2 is Saturday
+}
+
+export const DailySpendingSchema = z.object({
+  S: z.number(),
+  M: z.number(),
+  T: z.number(),
+  W: z.number(),
+  T2: z.number(),
+  F: z.number(),
+  S2: z.number(),
+});
+
+export interface WeeklySpendingSummaryData {
+  totalSpentThisWeek: number;
+  currency: string;
+  changeFromLastWeek: ChangeFromLastWeek;
+  dailySpending: DailySpending;
+  highlightDay: DayOfWeek;
+}
+
+export const WeeklySpendingSummaryDataSchema = z.object({
+  totalSpentThisWeek: z.number(),
+  currency: z.string(),
+  changeFromLastWeek: ChangeFromLastWeekSchema,
+  dailySpending: DailySpendingSchema,
+  highlightDay: DayOfWeekSchema,
+});
+
+export interface WeeklySpendingSummaryApiResponse {
+  success: boolean;
+  statusCode: number;
+  message: string;
+  data: WeeklySpendingSummaryData;
+}
+
+export const WeeklySpendingSummaryApiResponseSchema = z.object({
+  success: z.boolean(),
+  statusCode: z.number(),
+  message: z.string(),
+  data: WeeklySpendingSummaryDataSchema,
+}); 
