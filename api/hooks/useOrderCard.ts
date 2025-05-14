@@ -2,10 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApiService } from '../../common/hooks/useApiService';
 
 interface OrderCardVariables {
-  userId: string;
   symbol: string;
   chainType: string;
-  blockchainNetwork: string;
+  // blockchainNetwork is now sourced from env, removed from variables
 }
 
 // Define a more specific type if the structure of 'data' from POST response is known
@@ -26,20 +25,26 @@ export const useOrderCard = () => {
   return useMutation<
     OrderCardData,
     Error,
-    OrderCardVariables
+    // Update variable type here
+    Omit<OrderCardVariables, 'blockchainNetwork'> 
   >({
-    mutationFn: async (variables: OrderCardVariables) => {
-      const { userId, symbol, chainType, blockchainNetwork } = variables;
+    // Update function signature
+    mutationFn: async (variables: Omit<OrderCardVariables, 'blockchainNetwork'>) => {
+      // Destructure only needed variables
+      const { symbol, chainType } = variables;
+      // Get blockchainNetwork from environment variable
+      const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'default_network'; // Added a fallback
+
+      // Remove userId, use env var for blockchainNetwork
       const queryParams = new URLSearchParams({
-        userId,
         symbol,
         chainType,
         blockchainNetwork,
       }).toString();
       
-      // Assuming apiService handles the /api/v1 prefix
+      // Endpoint remains the same, userId is inferred by backend
       const response = await apiService.post(
-        `/cards/order?${queryParams}`,
+        `/cards/me/order?${queryParams}`,
         {} // Empty body for this POST request
       );
       const jsonResponse: ApiResponse<OrderCardData> = await response.json();
@@ -52,6 +57,8 @@ export const useOrderCard = () => {
     onSuccess: () => {
       // Invalidate and refetch the user query to reflect potential changes in card status
       queryClient.invalidateQueries({ queryKey: ['user'] });
+      // Maybe invalidate a cards query key too if one exists
+      // queryClient.invalidateQueries({ queryKey: ['cards'] }); 
     },
     mutationKey: ['orderCard'],
   });

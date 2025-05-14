@@ -1,0 +1,59 @@
+# Feature Architecture and Refactoring Guide
+
+This guide outlines the preferred architectural pattern for building and refactoring features within the application. The primary goals are to create clean, maintainable, reusable, and easily understandable code.
+
+## Core Principles
+
+1.  **Data Fetching & Logic Layer (Hooks):**
+    *   All API interactions, data fetching, and related business logic should be encapsulated within custom React hooks.
+    *   These hooks are responsible for fetching data, managing loading and error states, and performing initial data transformations if necessary.
+    *   **Example:** See how `[api/hooks/useGetUser.ts](mdc:api/hooks/useGetUser.ts)` centralizes fetching user data, including caching logic.
+
+2.  **Screen / Container Components:**
+    *   Screen components (typically found in the `app/` directory, e.g., `[app/(tab)/profile/index.tsx](mdc:app/(tab)/profile/index.tsx)`) act as containers or orchestrators.
+    *   They consume data from the data fetching hooks.
+    *   They handle the display of loading indicators or error messages based on the hook's state.
+    *   They prepare and pass down the necessary data and callbacks as props to presentational components.
+    *   Keep logic in these components minimal; complex logic should reside in hooks.
+
+3.  **Presentational Components:**
+    *   UI should be broken down into smaller, reusable presentational components (often located in `components/features/`).
+    *   These components are primarily concerned with how things look and receive data and behavior via props.
+    *   They should be as "dumb" as possible, meaning they don't fetch data or manage complex state themselves (unless it's purely local UI state).
+    *   **Examples:**
+        *   `[components/features/profile/ProfileHeader.tsx](mdc:components/features/profile/ProfileHeader.tsx)`
+        *   `[components/features/profile/AccountInfoSection.tsx](mdc:components/features/profile/AccountInfoSection.tsx)`
+        *   `[components/features/profile/AppSettingsSection.tsx](mdc:components/features/profile/AppSettingsSection.tsx)`
+        *   `[components/features/profile/UserActionsSection.tsx](mdc:components/features/profile/UserActionsSection.tsx)`
+        *   `[components/features/profile/AboutLinksSection.tsx](mdc:components/features/profile/AboutLinksSection.tsx)`
+        *   `[components/features/profile/GreetingHeader.tsx](mdc:components/features/profile/GreetingHeader.tsx)`
+    *   Composite components like `[components/features/profile/ProfileSettings.tsx](mdc:components/features/profile/ProfileSettings.tsx)` can assemble multiple smaller presentational components.
+
+4.  **State Management (Stores):**
+    *   For global or feature-specific state that needs to be shared across multiple components without prop drilling, use a state management library like Zustand.
+    *   Stores should define the state shape and actions to modify that state.
+    *   **Example:** `[store/settingsStore.ts](mdc:store/settingsStore.ts)` manages user preferences like biometrics and notification settings.
+
+5.  **Styling Preservation:**
+    *   **This is a critical requirement.** When refactoring existing code or implementing new features based on this architecture, **DO NOT CHANGE EXISTING STYLING.**
+    *   Styles should remain encapsulated within their respective components or defined in global style sheets (`global.css`). The visual appearance must be preserved.
+
+## Workflow Example
+
+1.  A **Screen Component** (e.g., `[app/(tab)/profile/index.tsx](mdc:app/(tab)/profile/index.tsx)`) initializes a **Data Fetching Hook** (e.g., `useGetUser`).
+2.  The hook fetches data, updates its loading/error/data state.
+3.  The Screen Component re-renders based on the hook's state.
+    *   If loading, it shows a loader.
+    *   If error, it shows an error message.
+    *   If data is available, it passes the relevant parts of the data as props to various **Presentational Components** (e.g., `ProfileHeader`, `AccountInfoSection`, etc.).
+4.  Presentational Components render the UI based on the received props.
+5.  If a user interaction triggers a state change that affects multiple components or is persistent (e.g., toggling a setting), that action might be dispatched to a **Store** (e.g., `useSettingsStore`). Components subscribed to that store will update accordingly.
+
+## Benefits
+
+*   **Separation of Concerns:** Clear distinction between data fetching/logic, UI orchestration, and UI rendering.
+*   **Reusability:** Presentational components and hooks can be reused across different parts of the application.
+*   **Testability:** Hooks and presentational components are easier to test in isolation.
+*   **Maintainability:** Code becomes more organized and easier to understand and modify.
+
+Adhering to this structure will help ensure the codebase remains robust and scalable. Remember to prioritize not altering styles during these architectural changes.

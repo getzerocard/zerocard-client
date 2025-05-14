@@ -16,8 +16,18 @@ import { DepositModalProvider } from '../common/hooks/useDepositModal';
 import { RootSiblingParent } from 'react-native-root-siblings';
 import { StatusBar } from 'expo-status-bar';
 import { UserProvider } from '../providers/UserProvider';
+import { useUsernameModal } from '../components/modals/username/hooks/useUsernameModal';
 
 const queryClient = new QueryClient();
+
+// New Wrapper component for modals that need context
+const GlobalModals = () => {
+  const { ModalComponent, modalProps } = useUsernameModal(); // Called within context
+  if (!ModalComponent || !modalProps) {
+    return null; // Or some placeholder/loading if preferred during init
+  }
+  return <ModalComponent {...modalProps} />;
+};
 
 export default function RootLayout() {
   // Get Privy app ID and client ID directly from environment variables
@@ -82,6 +92,8 @@ export default function RootLayout() {
                       <RootSiblingParent>
                         <AuthGuard />
                         <Slot />
+                        {/* Render the Username Modal globally via wrapper component */}
+                        <GlobalModals />
                       </RootSiblingParent>
                   </DepositModalProvider>
                 </CryptoDepositProvider>

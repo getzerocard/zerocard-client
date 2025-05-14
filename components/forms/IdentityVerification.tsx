@@ -23,6 +23,8 @@ import { useInitiateKycVerification } from '../../api/hooks/useInitiateKycVerifi
 import { useOrderCardStore } from '../../store/orderCardStore';
 import { useValidateKycOtp } from '../../api/hooks/useValidateKycOtp';
 import { usePrivy } from '@privy-io/expo';
+import { useUpdateUser } from '../../api/hooks/useUpdateUser';
+import { useOrderCard } from '../../api/hooks/useOrderCard';
 
 // Define the source of truth for identity types
 const IDENTITY_TYPES = [
@@ -70,10 +72,9 @@ const smallTickCircleIconSvg = `<svg width="14" height="14" viewBox="0 0 14 14" 
 
 interface IdentityVerificationProps {
   onClose: () => void;
-  onVerify: (idType: string, idNumber: string) => void;
 }
 
-const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, onVerify }) => {
+const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>> = ({ onClose }) => {
   const [selectedIdentity, setSelectedIdentity] = useState<string>('');
   const [identityNumber, setIdentityNumber] = useState<string>('');
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
@@ -84,6 +85,7 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
   const [otpVerified, setOtpVerified] = useState<boolean>(false);
   const [verifiedFullName, setVerifiedFullName] = useState<string>('');
   const [isBiometricLoading, setIsBiometricLoading] = useState<boolean>(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
 
   const dropdownAnimation = useRef(new Animated.Value(0)).current;
   const shakeAnimation = useRef(new Animated.Value(0)).current;
@@ -91,8 +93,10 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
 
   const initiateKycMutation = useInitiateKycVerification();
   const validateOtpMutation = useValidateKycOtp();
-  const { kycDetails, setKycVerificationDetails } = useOrderCardStore();
+  const { kycDetails, setKycVerificationDetails, shippingAddress } = useOrderCardStore();
   const { user: privyUser } = usePrivy();
+  const updateUserMutation = useUpdateUser();
+  const orderCardMutation = useOrderCard();
 
   // Helper function to get display label from ID
   const getDisplayLabel = (id: string): string => {
@@ -120,11 +124,11 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
             setIdentityInputError(null);
           },
           onError: (error) => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             // Always show "Service unavailable" on any initiation error
             setIdentityInputError("Service unavailable");
             
-            shakeField(shakeAnimation);
+          shakeField(shakeAnimation);
             setIdentityVerified(false);
           },
         }
@@ -159,10 +163,10 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
             } else {
               // Handle cases where API indicates success: true, but data indicates verification failed logically.
               // The hook handles success: false cases by throwing, landing in onError.
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               // Use a specific client-side message for this edge case.
               setOtpInputError('OTP validation failed. Please check the code and try again.');
-              shakeField(otpShakeAnimation);
+          shakeField(otpShakeAnimation);
               setOtpVerified(false);
             }
           },
@@ -175,7 +179,7 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
               setOtpInputError(error.message);
             } else if (error.message === "Record not found") {
               setOtpInputError(error.message);
-            } else {
+        } else {
               // Default to "Service unavailable" for all other errors (including 5xx or unknown)
               setOtpInputError("Service unavailable");
             }
@@ -205,6 +209,7 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
     setOtpVerified(false);
     setVerifiedFullName('');
     setIsBiometricLoading(false);
+    setIsSubmittingOrder(false);
     initiateKycMutation.reset();
     validateOtpMutation.reset();
   };
@@ -321,26 +326,28 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
     validateOtpMutation.reset();
   };
 
+  // TEMPORARY CHANGE FOR TESTING: Enable button even if OTP is not verified
+  // Original: const isFormValid = selectedIdentity && otpVerified;
   const isFormValid = selectedIdentity && otpVerified;
 
   const handleVerify = async () => {
-    if (!isFormValid || isBiometricLoading) {
+    // Check existing conditions plus new submitting state
+    if (!isFormValid || isBiometricLoading || isSubmittingOrder || initiateKycMutation.isPending || validateOtpMutation.isPending) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
+    // Start biometric check first
     setIsBiometricLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    let biometricSuccess = false;
 
     try {
       // Skip biometric auth on Android
       if (Platform.OS === 'android') {
-        // Directly proceed with verification on Android
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onVerify(selectedIdentity, identityNumber);
-        return;
-      }
-
+        biometricSuccess = true; // Assume success on Android for now
+      } else {
       // Only run biometric auth on iOS
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -356,13 +363,13 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Verify your identity',
+          promptMessage: 'Verify your identity to order card', // Updated prompt
         fallbackLabel: 'Enter Passcode',
       });
 
       if (result.success) {
+          biometricSuccess = true;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        onVerify(selectedIdentity, identityNumber);
       } else {
         Alert.alert(
           'Authentication Failed',
@@ -371,13 +378,81 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
             : 'Biometric authentication failed.'
         );
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
       }
     } catch (error) {
       console.error('Biometric authentication error:', error);
       Alert.alert('Error', 'An unexpected error occurred during biometric authentication.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
-      setIsBiometricLoading(false);
+      setIsBiometricLoading(false); // Biometric check finished
+    }
+
+    // Proceed only if biometric check was successful
+    if (!biometricSuccess) {
+      return;
+    }
+
+    // Start the concurrent API calls
+    setIsSubmittingOrder(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+
+    try {
+      // 1. Prepare UpdateUser payload
+      // Add a check for shippingAddress existence
+      if (!shippingAddress) {
+        throw new Error("Shipping address not found in store.");
+      }
+       // Construct payload, assuming country is 'USA' if not present
+      const updateUserPayload = {
+          shippingAddress: {
+            street: shippingAddress.street,
+            city: shippingAddress.city,
+            state: shippingAddress.state,
+            postalCode: shippingAddress.postalCode,
+            country: 'USA', // Assuming USA as default, adjust if needed
+          }
+        };
+
+
+      // 2. Prepare OrderCard variables
+      const orderCardVariables = {
+        symbol: 'USDC',
+        chainType: 'ethereum',
+        // blockchainNetwork is handled by the hook using env var
+      };
+      //TODO: this is where update update user address and order card
+      // 3. Execute mutations sequentially: update user first, then order card
+      console.log('Initiating user update...');
+      await updateUserMutation.mutateAsync({ payload: updateUserPayload });
+      
+      console.log('User update successful. Initiating card order...');
+      await orderCardMutation.mutateAsync(orderCardVariables);
+
+      console.log('User update and card order successful!');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Navigate on success of BOTH calls
+      router.push('/(app)/card-ordering/order-confirmation');
+
+    } catch (error: any) {
+      console.error('Error during card order process:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      // Provide more specific feedback if possible
+      let errorMessage = 'Failed to complete card order.';
+      if (error.message) {
+          // Check for specific errors from either mutation if needed
+          errorMessage += ` Error: ${error.message}`;
+      }
+      // Consider showing specific errors based on which mutation failed
+      // e.g., check updateUserMutation.isError, orderCardMutation.isError after Promise.all settles
+      Alert.alert('Order Error', errorMessage);
+      
+      // Reset mutation states if necessary (optional, depends on hook implementation)
+      // updateUserMutation.reset();
+      // orderCardMutation.reset();
+    } finally {
+      setIsSubmittingOrder(false); // API calls finished
     }
   };
 
@@ -437,27 +512,27 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               }
             }}>
-            <Animated.View
-              style={[styles.textField, { transform: [{ translateX: shakeAnimation }] }]}>
-              <View style={styles.textFieldContent}>
+          <Animated.View
+            style={[styles.textField, { transform: [{ translateX: shakeAnimation }] }]}>
+            <View style={styles.textFieldContent}>
                 {identityVerified && !initiateKycMutation.isPending ? (
-                  <Text style={styles.selectedText}>{formatPhoneNumber(identityNumber)}</Text>
-                ) : (
-                  <TextInput
+                <Text style={styles.selectedText}>{formatPhoneNumber(identityNumber)}</Text>
+              ) : (
+                <TextInput
                     style={[styles.input, (identityInputError || initiateKycMutation.isError) && styles.errorText]}
-                    placeholder="Enter identity number"
-                    placeholderTextColor="#9A9A9A"
-                    value={identityNumber}
-                    onChangeText={handleIdentityNumberChange}
-                    keyboardType="numeric"
-                    maxLength={11}
+                  placeholder="Enter identity number"
+                  placeholderTextColor="#9A9A9A"
+                  value={identityNumber}
+                  onChangeText={handleIdentityNumberChange}
+                  keyboardType="numeric"
+                  maxLength={11}
                     editable={!!selectedIdentity && !initiateKycMutation.isPending && !identityVerified}
-                  />
-                )}
+                />
+              )}
                 {initiateKycMutation.isPending && <LoadingSpinner size="small" color="#ffffff" />}
                 {identityVerified && !initiateKycMutation.isPending && <SvgXml xml={tickCircleIconSvg} width={16} height={16} />}
-              </View>
-            </Animated.View>
+            </View>
+          </Animated.View>
           </TouchableOpacity>
 
           {/* OTP Input Field - Only show after identity is verified and before OTP is verified */}
@@ -548,30 +623,32 @@ const IdentityVerification: React.FC<IdentityVerificationProps> = ({ onClose, on
                   },
                 ]}>
                 {IDENTITY_TYPES.map((identityType) => (
-                  <TouchableOpacity
+                <TouchableOpacity
                     key={identityType.id}
-                    style={styles.dropdownItem}
+                  style={styles.dropdownItem}
                     onPress={() => selectIdentityType(identityType.id)}>
                     <Text style={styles.dropdownItemText}>{identityType.label}</Text>
-                  </TouchableOpacity>
+                </TouchableOpacity>
                 ))}
               </Animated.View>
             </TouchableOpacity>
           </View>
         </Modal>
 
-        {/* Verify Button */}
+        {/* Verify Button - Update disabled condition and loading state */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={[
               styles.verifyButton,
-              (!isFormValid || initiateKycMutation.isPending || validateOtpMutation.isPending || isBiometricLoading) &&
+              (!isFormValid || initiateKycMutation.isPending || validateOtpMutation.isPending || isBiometricLoading || isSubmittingOrder) && // Add isSubmittingOrder
                 styles.verifyButtonDisabled,
             ]}
             onPress={handleVerify}
             activeOpacity={0.8}
-            disabled={!isFormValid || initiateKycMutation.isPending || validateOtpMutation.isPending || isBiometricLoading}>
-            {isBiometricLoading ? (
+            disabled={!isFormValid || initiateKycMutation.isPending || validateOtpMutation.isPending || isBiometricLoading || isSubmittingOrder} // Add isSubmittingOrder
+            >
+            {/* Show spinner if either biometric or API calls are loading */}
+            {isBiometricLoading || isSubmittingOrder ? ( 
               <LoadingSpinner size="small" color="#000000" />
             ) : (
               <>

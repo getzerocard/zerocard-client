@@ -36,6 +36,10 @@ export const useInitiateKycVerification = () => {
       );
       const jsonResponse: ApiResponse<InitiateKycVerificationData> = await response.json();
       
+      // Log the full JSON response and status for debugging
+      console.log('[useInitiateKycVerification] API Response Status:', response.status);
+      console.log('[useInitiateKycVerification] API JSON Response:', JSON.stringify(jsonResponse, null, 2));
+
       if (!jsonResponse.success || response.status >= 400) {
         // Custom error for 400-500 range
         if (response.status >= 400 && response.status < 600) {

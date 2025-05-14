@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApiService } from '../../common/hooks/useApiService';
 
 // This type should ideally match the full user profile structure 
@@ -32,7 +32,7 @@ export interface UserProfileResponse { // Renamed for clarity, assuming it's a f
   phoneNumber?: string;
   // Potentially nested objects like shippingAddress, identification etc.
   verificationStatus?: string;
-  cardOrderStatus?: string;
+  cardOrderStatus: string;
   customerId?: string;
   timeZone?: string;
   accountId?: string;
@@ -46,6 +46,7 @@ export interface UserProfileResponse { // Renamed for clarity, assuming it's a f
 
 export const useCreateUser = () => {
   const apiService = useApiService();
+  const queryClient = useQueryClient();
 
   // The mutation should now expect UserProfileResponse
   return useMutation<UserProfileResponse, Error>({ 
@@ -61,5 +62,12 @@ export const useCreateUser = () => {
       }
     },
     mutationKey: ['createUser'], // This key might be better as ['user', 'profile'] or similar if it fetches profile
+    onSuccess: (data) => {
+      // When this mutation (often used as a fetch/ensure profile mechanism) succeeds,
+      // invalidate the standard query for getting the user profile.
+      // This ensures useGetUser hook will refetch and update its cache and AsyncStorage.
+      console.log('[useCreateUser] onSuccess: Invalidating [\'user\', \'me\'] query key.');
+      queryClient.invalidateQueries({ queryKey: ['user', 'me'] });
+    },
   });
 };

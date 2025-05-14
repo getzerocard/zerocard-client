@@ -1,0 +1,139 @@
+# React Query Hook Template
+
+This guide outlines a standard pattern for creating data-fetching hooks in a React Native application using TanStack Query (React Query), a centralized API service, and a dual caching strategy (React Query's in-memory cache and `AsyncStorage` for persistence).
+
+The primary example for this pattern is `[api/hooks/useGetUser.ts](mdc:api/hooks/useGetUser.ts)`.
+
+## Core Components and Patterns
+
+### 1. Hook Definition
+- **File Location**: Typically under `api/hooks/` or a feature-specific hooks directory.
+- **Naming**: Use a descriptive name, e.g., `useGetEntityName.ts`.
+- **Return Type**: Should be `UseQueryResult<ApiResponseType | undefined, Error>` from `@tanstack/react-query`. The `| undefined` in `ApiResponseType | undefined` is important if `initialData` can return `undefined`.
+
+### 2. TypeScript Types
+Define clear types for:
+- The actual data structure (e.g., `UserProfile`).
+- The overall API response structure if it includes metadata like `message`, `success`, `statusCode` (e.g., `UserApiResponse` where the actual data is nested, like `data: UserProfile`).
+
+```typescript
+// Example from [api/hooks/useGetUser.ts](mdc:api/hooks/useGetUser.ts)
+export type UserProfile = {
+  username: string;
+  id?: string;
+  // ... other fields
+};
+
+export type UserApiResponse = {
+  data: UserProfile;
+  message?: string;
+  success?: boolean;
+  statusCode?: number;
+};
+```
+
+### 3. API Service Abstraction
+- Utilize a centralized API service hook (e.g., `useApiService` as seen in `[common/hooks/useApiService.ts](mdc:common/hooks/useApiService.ts)`) to handle base URL, headers (including auth tokens), and HTTP methods.
+- This keeps the actual data-fetching logic clean and promotes reusability of the API service configuration.
+
+### 4. `queryFn` (Data Fetching Function)
+This is an asynchronous function responsible for fetching data from the API.
+- **Naming**: Typically `fetchEntityName`, e.g., `fetchUser`.
+- **Parameters**: It should accept the instantiated API service.
+- **Error Handling**: Implement a `try...catch` block to handle API errors and re-throw them for React Query to manage.
+- **Logging**:
+    - Log the start of the fetch.
+    - Log the API response status.
+    - Log any errors encountered.
+- **AsyncStorage Caching (Persistence)**:
+    - After successfully fetching and parsing the data, save it to `AsyncStorage`.
+    - Use a clear `STORAGE_KEY` (e.g., `user_profile`).
+    - Remember to `JSON.stringify()` the data before saving.
+    - Log successful caching.
+
+```typescript
+// Example structure from [api/hooks/useGetUser.ts](mdc:api/hooks/useGetUser.ts)
+const STORAGE_KEY = 'entity_profile'; // Change 'entity' as needed
+
+const fetchEntity = async (apiService: ReturnType<typeof useApiService>): Promise<EntityApiResponse> => {
+  console.log('[useGetEntity - fetchEntity] Starting to fetch entity...');
+  try {
+    const response = await apiService.get('/entity/me'); // Adjust endpoint
+    console.log('[useGetEntity - fetchEntity] Received response from apiService. Status:', response.status);
+
+    const apiResponseData: EntityApiResponse = await response.json();
+
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(apiResponseData));
+    console.log('[useGetEntity - fetchEntity] AsyncStorage item set successfully for key:', STORAGE_KEY);
+    return apiResponseData;
+  } catch (error) {
+    console.error('[useGetEntity - fetchEntity] Error during fetchEntity:', error);
+    throw error; 
+  }
+};
+```
+
+### 5. `useQuery` Hook Implementation
+- **`queryKey`**:
+    - Define a unique and descriptive query key, typically an array (e.g., `['entity', 'me']` or `['entity', entityId]`).
+    - Use `as const` for type safety if the key structure is static.
+- **`queryFn`**: Pass the data fetching function (e.g., `() => fetchEntity(apiService)`).
+- **`initialData` (Synchronous Cache Read)**:
+    - Use a synchronous function to attempt to read data from React Query's in-memory cache.
+    - Get the `queryClient` instance using `useQueryClient()`.
+    - Call `queryClient.getQueryData<EntityApiResponse>(queryKey)`.
+    - If data exists, return it. This provides instant UI updates if data is already in the in-memory cache.
+    - If not, return `undefined`. `queryFn` will then execute.
+    - Log whether data was found in the cache.
+- **Caching Options**:
+    - `staleTime`: How long data is considered fresh (e.g., `1000 * 60 * 2` for 2 minutes). Prevents refetching on mount if data is fresh.
+    - `refetchOnMount`: `false` if `staleTime` is used effectively, or `true`/`"always"` based on requirements.
+    - `refetchOnWindowFocus`: Typically `true`.
+    - `refetchOnReconnect`: Typically `true`.
+- **`retry`**: Configure retry attempts (e.g., `1` or `3`).
+
+```typescript
+// Example from [api/hooks/useGetUser.ts](mdc:api/hooks/useGetUser.ts)
+export const useGetEntity = (): UseQueryResult<EntityApiResponse | undefined, Error> => {
+  const apiService = useApiService();
+  const queryClient = useQueryClient();
+  // console.log('[useGetEntity] Hook called...'); // Optional: for debugging hook re-renders
+
+  const queryKey = ['entity', 'me'] as const; // Adjust as needed
+
+  return useQuery<EntityApiResponse, Error, EntityApiResponse | undefined, typeof queryKey>({
+    queryKey: queryKey,
+    queryFn: () => fetchEntity(apiService),
+    staleTime: 1000 * 60 * 5, // 5 minutes, adjust as needed
+    refetchOnMount: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: 1,
+    initialData: () => {
+      const cachedData = queryClient.getQueryData<EntityApiResponse>(queryKey);
+      if (cachedData) {
+        console.log('[useGetEntity - initialData] Found data in React Query cache for key:', queryKey);
+        return cachedData;
+      }
+      console.log('[useGetEntity - initialData] No data found in React Query cache for key:', queryKey);
+      return undefined;
+    },
+  });
+};
+```
+
+## Cache Management on Logout
+
+It's crucial to clear caches when the user logs out to prevent data leakage between sessions.
+A dedicated `useLogout` hook should:
+1. Clear React Query's in-memory cache: `queryClient.clear()`.
+2. Remove relevant items from `AsyncStorage`: `AsyncStorage.removeItem(STORAGE_KEY)`.
+3. Clear any other session-related store (e.g., Zustand, Redux).
+
+## Considerations
+
+- **AsyncStorage Read for `initialData`**: While `AsyncStorage.getItem()` is async and doesn't fit directly into the synchronous `initialData` function without workarounds, the current pattern relies on `fetchUser` to populate `AsyncStorage`. React Query's in-memory cache (populated by previous `fetchUser` calls or a cache persister) is checked first by `initialData`. If truly instant UI from `AsyncStorage` on the very first load (before any `fetchUser` in the session) is critical, explore React Query persisters or a more complex `initialData` setup that can await a promise (though this had typing issues previously).
+- **Error States**: Ensure UI components handle `isLoading`, `isError`, and `error` states returned by the hook.
+- **Data Transformation**: If API data needs transformation before being used in the UI, it can be done in the `queryFn` before returning, or in a `select` option within `useQuery`.
+
+This template provides a robust foundation for fetching, caching, and managing server state in your application.

@@ -47,18 +47,15 @@ type UserStage = 'new_user' | 'ordered_card' | 'activated_card' | 'has_transacti
 
 import { useIdentityTokenProvider } from '../../(app)/context/identityTokenContexts';
 import { useAccessTokenProvider } from '../../(app)/context/accessTokenContext';
+import { useGetUser } from '../../../api/hooks/useGetUser';
+import { useUserContext } from '../../../providers/UserProvider'; // Import useUserContext
 
 export default function HomeScreen() {
   console.log('[HomeScreen] Rendering');
   const { user, logout } = usePrivy() as any;
   const insets = useSafeAreaInsets();
-  // State for username
-  const [username, setUsername] = useState<string>('');
-  // State for user's stage in the onboarding process - MOVED UP before usage
-  const [userStage, setUserStage] = useState<UserStage>('new_user');
-  // State for refresh control - MOVED TO TOP LEVEL
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  
+  // State for username - REMOVED
+  // const [username, setUsername] = useState<string>('');
   const {
     showLimitToast,
     showWithdrawalToast,
@@ -180,42 +177,54 @@ export default function HomeScreen() {
     }
   }, [showWithdrawalToast]);
 
-  // Load saved state from AsyncStorage and check for username
-  useEffect(() => {
-    const loadSavedState = async () => {
-      try {
-        // Check if user is verified
-        const userVerified = await AsyncStorage.getItem('user_verified');
-        const cardOrdered = await AsyncStorage.getItem('card_ordered');
-        const savedUsername = await AsyncStorage.getItem('username');
+  // Load saved state from AsyncStorage - REMOVED (userStage now from context)
+  // useEffect(() => {
+  //   const loadCardOrderState = async () => {
+  //     try {
+  //       const cardOrdered = await AsyncStorage.getItem('card_ordered');
+  //       if (cardOrdered === 'true') {
+  //         setUserStage('ordered_card');
+  //       }
+  //     } catch (error) {
+  //       console.error('Error loading card_ordered state:', error);
+  //     }
+  //   };
+  //   loadCardOrderState();
+  // }, []);
 
-        // Log the username from AsyncStorage and rely on UserProvider for isNewUser logic
-        console.log('[HomeScreen] loadSavedState - savedUsername from AsyncStorage:', savedUsername);
-
-        if (savedUsername) {
-          setUsername(savedUsername); // Still set for display purposes
-        } else {
-          // The modal visibility is now solely handled by useUsernameModal based on isNewUser from context
-          console.log('[HomeScreen] No local username found in AsyncStorage. Modal visibility determined by UserProvider.');
-        }
-
-        // If card was ordered, update the stage
-        if (cardOrdered === 'true') {
-          setUserStage('ordered_card');
-        }
-      } catch (error) {
-        console.error('Error loading saved state:', error);
-      }
-    };
-
-    loadSavedState();
-  }, []); // Dependency array is empty again, as this primarily loads local state.
+  // Get user data, including username from useGetUser, and cardStage from useUserContext
+  const { data: userResponse, isLoading: isLoadingUser, error: userError } = useGetUser();
+  const { cardStage, refetchCreateUserMutation } = useUserContext(); // Get cardStage and refetch function
 
   // Get username from state or email as fallback
-  const displayName = username || (user?.email ? user.email.split('@')[0] : '');
+  
+  const displayName = React.useMemo(() => {
+    if (isLoadingUser) {
+      return 'User...'; // Or some other loading indicator
+    }
+    if (userError || !userResponse?.data?.username) {
+      // Fallback to privy user email if available, otherwise a generic default
+      return user?.email ? user.email.split('@')[0] : 'User';
+    }
+    return userResponse.data.username;
+  }, [userResponse, isLoadingUser, userError, user?.email]);
+
   const userInitial = displayName && displayName.length > 0 ? displayName[0].toUpperCase() : 'U';
 
-  
+  // Update userStage based on card_ordered from AsyncStorage (can remain for now, or be moved to useGetUser if cardOrderStatus is reliable) - REMOVED
+  // useEffect(() => {
+  //   const loadCardOrderState = async () => {
+  //     try {
+  //       const cardOrdered = await AsyncStorage.getItem('card_ordered');
+  //       if (cardOrdered === 'true') {
+  //         setUserStage('ordered_card');
+  //       }
+  //     } catch (error) {
+  //       console.error('Error loading card_ordered state:', error);
+  //     }
+  //   };
+  //   loadCardOrderState();
+  // }, []);
 
   // Handle profile press - on Android, show username modal
   const handleProfilePress = () => {
@@ -263,15 +272,20 @@ export default function HomeScreen() {
 
   const handleSelectCardType = async (cardType: 'physical' | 'contactless') => {
     // In a real app, this would call an API to order the selected card type
-    console.log(`${cardType} card ordered`);
-    setUserStage('ordered_card');
+    console.log(`${cardType} card ordered - simulation.`);
+    // setUserStage('ordered_card'); // REMOVED - Handled by UserProvider via refetch
 
-    // Save ordered state
-    try {
-      await AsyncStorage.setItem('card_ordered', 'true');
-    } catch (error) {
-      console.error('Error saving card ordered state:', error);
-    }
+    // Save ordered state - REMOVED (no longer needed, API is source of truth)
+    // try {
+    //   await AsyncStorage.setItem('card_ordered', 'true');
+    // } catch (error) {
+    //   console.error('Error saving card ordered state:', error);
+    // }
+
+    // After simulating card order, refetch user data to update cardStage in context
+    console.log('[HomeScreen] Simulating card order, calling refetchCreateUserMutation.');
+    refetchCreateUserMutation(); 
+    setCardTypeModalVisible(false); // Close the modal
   };
 
   const handleLoadWallet = () => {
@@ -291,17 +305,21 @@ export default function HomeScreen() {
 
   // Card number based on state
   const getCardNumber = () => {
-    return mockData.userStages[userStage]?.cardNumber || 'No card found';
+    // This mock data access might need to change based on how cardStage maps to these stages
+    const currentDisplayStage = cardStage === 'activated' ? 'activated_card' : cardStage === 'pending_activation' ? 'ordered_card' : 'new_user';
+    return mockData.userStages[currentDisplayStage]?.cardNumber || 'No card found';
   };
 
   // Get expiry date based on state
   const getExpiryDate = () => {
-    return mockData.userStages[userStage]?.expiryDate || '··/··';
+    const currentDisplayStage = cardStage === 'activated' ? 'activated_card' : cardStage === 'pending_activation' ? 'ordered_card' : 'new_user';
+    return mockData.userStages[currentDisplayStage]?.expiryDate || '··/··';
   };
 
   // Get wallet address based on state
   const getWalletAddress = () => {
-    return mockData.userStages[userStage]?.walletAddress || '········';
+    const currentDisplayStage = cardStage === 'activated' ? 'activated_card' : cardStage === 'pending_activation' ? 'ordered_card' : 'new_user';
+    return mockData.userStages[currentDisplayStage]?.walletAddress || '········';
   };
 
   // Render empty transactions state
@@ -326,13 +344,13 @@ export default function HomeScreen() {
   // Get current tracking status based on user stage (for modal)
   const getCurrentTrackingStatus = (): TrackingStatus => {
     // This logic might need refinement based on actual app states
-    if (userStage === 'ordered_card') {
+    if (cardStage === 'pending_activation') { // Changed from userStage === 'ordered_card'
       return 'picked_up'; // Or 'on_delivery' based on more detailed status
     }
-    if (userStage === 'activated_card' || userStage === 'has_transactions') {
+    if (cardStage === 'activated') { // Changed from userStage === 'activated_card' || userStage === 'has_transactions'
       return 'delivered'; // Assuming delivered if activated
     }
-    return 'accepted'; // Default if new_user or just ordered
+    return 'accepted'; // Default if not_ordered or unknown
   };
 
   // Generate estimated delivery date (example: 5 days from now)
@@ -421,24 +439,24 @@ export default function HomeScreen() {
           </View>
 
           {/* Card Status - Only show for new users and users who ordered a card */}
-          {(userStage === 'new_user' || userStage === 'ordered_card') && (
+          {(cardStage === 'not_ordered' || cardStage === 'pending_activation') && (
             <View style={styles.cardStatusContainer}>
               <CardStatusComponent
-                status={userStage === 'new_user' ? 'not_found' : 'ordered'}
+                status={cardStage === 'not_ordered' ? 'not_found' : 'ordered'}
                 onPrimaryButtonPress={
-                  userStage === 'new_user'
+                  cardStage === 'not_ordered'
                     ? handleOrderCard
                     : () => router.push('/(app)/card-activation/qr-scanner')
                 }
                 onSecondaryButtonPress={
-                  userStage === 'new_user' ? handleLoadWallet : handleCheckStatus
+                  cardStage === 'not_ordered' ? handleLoadWallet : handleCheckStatus
                 }
               />
             </View>
           )}
 
           {/* Card Controls - Only show for users with activated cards */}
-          {(userStage === 'activated_card' || userStage === 'has_transactions') && (
+          {(cardStage === 'activated') && (
             <View style={styles.cardControlsContainer}>
               <CardControls
                 onLoadCard={() => {
@@ -452,14 +470,14 @@ export default function HomeScreen() {
           )}
 
           {/* Spending Limit Dialog - Only show for users with activated cards */}
-          {(userStage === 'activated_card' || userStage === 'has_transactions') && (
+          {(cardStage === 'activated') && (
             <View style={styles.spendingLimitContainer}>
               <SpendingLimitDialog onPress={handleSpendingLimitPress} />
             </View>
           )}
 
           {/* Transactions Section - Only show for users with activated cards */}
-          {(userStage === 'activated_card' || userStage === 'has_transactions') && (
+          {(cardStage === 'activated') && (
             <View style={styles.transactionsContainer}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recent Transactions</Text>
@@ -467,14 +485,21 @@ export default function HomeScreen() {
               </View>
 
               {/* Show transactions or empty state based on user stage */}
-              {transactions && transactions.length > 0 ? (
-                transactions.map((transaction) => (
-                  <TransactionItem
-                    key={transaction.transactionHash || `tx-${transaction.dateAndTime}`}
-                    transaction={transaction}
-                  />
-                ))
-              ) : renderEmptyTransactions()}
+              {cardStage === 'activated' // Assuming 'activated' means they can have transactions
+                ? mockData.transactions.map((transaction) => (
+                    <TransactionItem
+                      key={transaction.id}
+                      id={transaction.id}
+                      type={transaction.amount > 0 ? 'deposit' : 'spend'}
+                      name={transaction.name}
+                      amount={Math.abs(transaction.amount)}
+                      date={transaction.date}
+                      time={transaction.timestamp.split('T')[1].substring(0, 5)}
+                      currency="USDC"
+                      category={transaction.category}
+                    />
+                  ))
+                : renderEmptyTransactions()}
             </View>
           )}
 
