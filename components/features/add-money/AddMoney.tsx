@@ -122,10 +122,10 @@ export const AddMoney: React.FC<AddMoneyProps> = ({ onFundedWallet, onSkip }) =>
     <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Image
+          {/* <Image
             source={require('../../../assets/images/base-logo-in-blue.png')}
             style={styles.logo}
-          />
+          /> */}
           <Text style={styles.title}>Add Money</Text>
         </View>
 

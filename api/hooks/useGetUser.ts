@@ -28,7 +28,7 @@ export type UserApiResponse = {
 const fetchUser = async (apiService: ReturnType<typeof useApiService>): Promise<UserApiResponse> => {
   console.log('[useGetUser - fetchUser] Starting to fetch user...');
   try {
-    const response = await apiService.get('/users/me?sync=true');
+  const response = await apiService.get('/users/me?sync=true');
     console.log('[useGetUser - fetchUser] Received response from apiService. Status:', response.status);
 
     const apiResponseData: UserApiResponse = await response.json();

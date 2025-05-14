@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   StatusBar,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +34,7 @@ import CryptoDepositModal from '../../../components/modals/crypto-deposit/Crypto
 import { useCryptoDepositListener } from '../../../components/context/CryptoDepositContext'; 
 // Import the transaction hook
 import { useUserTransactions } from '../../../common/hooks/useUserTransactions';
+import type { Transaction } from '../../../types/transactions'; // Import Transaction type
 // Define TrackingStatus type locally as it's defined within modals
 type TrackingStatus = 'accepted' | 'picked_up' | 'on_delivery' | 'delivered';
 
@@ -54,8 +56,8 @@ export default function HomeScreen() {
   console.log('[HomeScreen] Rendering');
   const { user, logout } = usePrivy() as any;
   const insets = useSafeAreaInsets();
-  // State for username - REMOVED
-  // const [username, setUsername] = useState<string>('');
+  const { cardStage, refetchCreateUserMutation } = useUserContext(); // Get cardStage and refetch function
+  const [isRefreshing, setIsRefreshing] = useState(false); // Moved declaration up
   const {
     showLimitToast,
     showWithdrawalToast,
@@ -70,16 +72,19 @@ export default function HomeScreen() {
 
   // Fetch user transactions
   const { 
-    data: transactions, 
+    data: transactionsResponse, // Renamed to avoid conflict if transactions is used elsewhere
     isLoading: transactionsLoading, 
     error: transactionsError, 
     refetch: refetchTransactions
   } = useUserTransactions({
     limit: 5, // Fetch 5 most recent transactions
-    enabled: userStage === 'has_transactions' || userStage === 'activated_card'
+    enabled: cardStage === 'activated'
   });
 
-  // Callback function for RefreshControl - MOVED TO TOP LEVEL
+  // Extract actual transactions array, default to empty array if no data
+  const transactions: Transaction[] = transactionsResponse || []; // Corrected access and typed
+
+  // Callback function for RefreshControl
   const onRefresh = useCallback(async () => {
     console.log('[HomeScreen] Pull to refresh triggered');
     setIsRefreshing(true);
@@ -194,7 +199,6 @@ export default function HomeScreen() {
 
   // Get user data, including username from useGetUser, and cardStage from useUserContext
   const { data: userResponse, isLoading: isLoadingUser, error: userError } = useGetUser();
-  const { cardStage, refetchCreateUserMutation } = useUserContext(); // Get cardStage and refetch function
 
   // Get username from state or email as fallback
   
@@ -371,8 +375,9 @@ export default function HomeScreen() {
 
   // Add a new function to set the userStage to has_transactions
   const handleSimulateHasTransactions = () => {
-    console.log('Setting userStage to has_transactions');
-    setUserStage('has_transactions');
+    console.log('Setting userStage to has_transactions - NO LONGER SETS STATE DIRECTLY');
+    // setUserStage('has_transactions'); // Commented out to prevent ReferenceError
+    // TODO: Re-evaluate how to simulate this state if needed, perhaps by updating cardStage via context or a mutation.
   };
 
   return (
@@ -485,21 +490,20 @@ export default function HomeScreen() {
               </View>
 
               {/* Show transactions or empty state based on user stage */}
-              {cardStage === 'activated' // Assuming 'activated' means they can have transactions
-                ? mockData.transactions.map((transaction) => (
-                    <TransactionItem
-                      key={transaction.id}
-                      id={transaction.id}
-                      type={transaction.amount > 0 ? 'deposit' : 'spend'}
-                      name={transaction.name}
-                      amount={Math.abs(transaction.amount)}
-                      date={transaction.date}
-                      time={transaction.timestamp.split('T')[1].substring(0, 5)}
-                      currency="USDC"
-                      category={transaction.category}
-                    />
-                  ))
-                : renderEmptyTransactions()}
+              {transactionsLoading ? (
+                <ActivityIndicator style={{ marginVertical: 20 }} />
+              ) : transactionsError ? (
+                <Text style={styles.emptyTransactionsText}>Error loading transactions.</Text>
+              ) : transactions.length > 0 ? (
+                transactions.map((transaction: Transaction) => (
+                  <TransactionItem
+                    key={transaction.transactionHash || transaction.dateAndTime} // Use transactionHash or a composite key
+                    transaction={transaction} // Pass the whole transaction object
+                  />
+                ))
+              ) : (
+                renderEmptyTransactions() // Use existing function for empty/error state
+              )}
             </View>
           )}
 
@@ -528,6 +532,24 @@ export default function HomeScreen() {
               >
                 <Ionicons name="list-outline" size={20} color="#FFFFFF" />
                 <Text style={styles.simulationButtonText}>Show Transactions</Text>
+              </TouchableOpacity>
+
+              {/* New button to simulate crypto deposit */}
+              <TouchableOpacity
+                style={[styles.simulationButton, { backgroundColor: '#5433FF' }]}
+                onPress={() => handleNewDeposit({
+                  amount: '123.45',
+                  currency: 'USDC',
+                  chain: 'Base',
+                  transactionHash: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+                  timestamp: {
+                    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+                  },
+                })}
+              >
+                <Ionicons name="arrow-down-circle-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.simulationButtonText}>Simulate Deposit</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

@@ -49,7 +49,7 @@ export const useUpdateUser = () => {
         { method: 'PATCH' }
       );
       const jsonResponse: ApiResponse<UpdateUserData> = await response.json();
-      
+
       // Log the full JSON response for debugging
       console.log('[useUpdateUser] API Full Response:', JSON.stringify(jsonResponse, null, 2));
 

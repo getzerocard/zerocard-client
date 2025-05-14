@@ -241,15 +241,15 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
     const finalPostalCode = postalCode.trim() === '' ? DEFAULT_POSTAL_CODE : postalCode;
 
     const currentAddressData: AddressData = {
-      street,
-      city,
-      state,
+        street,
+        city,
+        state,
       postalCode: finalPostalCode,
-      fullAddress: selectedAddress?.properties.formatted,
-      longitude: selectedAddress?.properties.lon,
-      latitude: selectedAddress?.properties.lat,
+        fullAddress: selectedAddress?.properties.formatted,
+        longitude: selectedAddress?.properties.lon,
+        latitude: selectedAddress?.properties.lat,
       country: selectedAddress?.properties.country || 'Nigeria',
-    };
+      };
 
     // Save to the new orderCardStore
     const { setShippingAddress } = useOrderCardStore.getState();
@@ -280,8 +280,8 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
       console.log('[ShippingAddress] updateUserMutation successful.');
 
       // Call the onContinue prop if provided, after successful user update
-      if (onContinue) {
-        onContinue(currentAddressData);
+    if (onContinue) {
+      onContinue(currentAddressData);
       }
     } catch (error) {
       console.error('[ShippingAddress] updateUserMutation failed:', error);
@@ -459,7 +459,7 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
           {isUpdatingUser ? (
             <ActivityIndicator color="#000000" />
           ) : (
-            <Text style={styles.continueButtonText}>Continue</Text>
+          <Text style={styles.continueButtonText}>Continue</Text>
           )}
         </TouchableOpacity>
 
