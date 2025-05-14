@@ -89,18 +89,23 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
               const upperStatus = apiCardOrderStatus.toUpperCase();
               if (upperStatus === 'NOT_ORDERED') {
                 derivedCardStage = 'not_ordered';
-              } else if (['ORDERED', 'PROCESSING', 'SHIPPED', 'PENDING_ACTIVATION'].includes(upperStatus)) {
+              } else if (
+                upperStatus === 'ORDERED' ||
+                upperStatus === 'SHIPPED' ||
+                upperStatus === 'DELIVERED' ||
+                upperStatus === 'PROCESSED' ||
+                upperStatus === 'IN_DELIVERY' ||
+                upperStatus === 'IN_TRANSIT'
+              ) {
                 derivedCardStage = 'pending_activation';
-              } else if (upperStatus === 'ACTIVE' || upperStatus === 'ACTIVATED') {
+              } else if (upperStatus === 'ACTIVATED') {
                 derivedCardStage = 'activated';
               } else {
                 console.warn(`[UserProvider] Unknown cardOrderStatus from API: ${apiCardOrderStatus}`);
-                derivedCardStage = 'unknown'; // Or default to not_ordered
+                derivedCardStage = 'unknown'; // Default for unrecognized statuses
               }
             } else {
-              // If cardOrderStatus is null/undefined, assume not ordered, especially if user is new
-              // For existing users without this field, it might mean 'unknown' or an older state.
-              // Let's assume 'not_ordered' if the field is missing.
+              // If cardOrderStatus is null/undefined, assume not ordered.
               derivedCardStage = 'not_ordered'; 
               console.log('[UserProvider] cardOrderStatus missing in API response, defaulting to not_ordered.');
             }
