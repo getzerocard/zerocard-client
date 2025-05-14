@@ -3,6 +3,9 @@ import { useApiService } from './useApiService';
 import { GetTransactionsSuccessResponse, Transaction } from '../../types/transactions';
 import { ApiErrorResponse } from '../../types/spendingLimit'; // Reusing general error type
 
+// Re-export Transaction type for use in other modules
+export type { Transaction };
+
 interface UseUserTransactionsParams {
   page?: number;
   limit?: number;
@@ -31,12 +34,8 @@ export function useUserTransactions({
     queryFn: async (): Promise<GetTransactionsSuccessResponse> => {
       const endpoint = `/transactions/me?limit=${limit}&page=${page}`;
       const response = await get(endpoint);
-      // The useApiService already throws an error for !response.ok
-      // and parses JSON, so we can directly work with the parsed data.
-      // However, the current useApiService.get returns a Response object, not parsed JSON directly.
-      // We need to call .json() on it.
+      
       if (!response.ok) {
-        // Attempt to parse error JSON, otherwise throw a generic error
         let errorData: ApiErrorResponse;
         try {
           errorData = await response.json();
@@ -44,12 +43,36 @@ export function useUserTransactions({
           errorData = {
             statusCode: response.status,
             success: false,
-            message: `API request failed with status ${response.status}`,
+            message: `API request failed with status ${response.status} and could not parse error body.`,
           };
         }
-        throw errorData; // This will be caught by React Query
+        console.error('Fetching transactions failed (original error):', errorData); // Log original
+
+        let finalMessage: string;
+        const status = errorData.statusCode || response.status;
+
+        switch (status) {
+          case 400:
+            finalMessage = "There was an issue with the information used to fetch your transactions. Please try refreshing. If the problem persists, contact support.";
+            break;
+          case 401:
+          case 403:
+            finalMessage = "You are not authorized to view these transactions. Please contact support if you believe this is an error.";
+            break;
+          case 404:
+            finalMessage = "No transactions found. If you're expecting transactions, they may not have processed yet.";
+            break;
+          case 500:
+            finalMessage = "We're currently unable to fetch your transactions due to a server issue. Please try again shortly.";
+            break;
+          default:
+            console.warn(`Unhandled error status code: ${status} with original message: ${errorData.message}`);
+            finalMessage = "We couldn't fetch your transactions due to an unexpected issue. Please try refreshing. If the problem continues, please contact support.";
+            break;
+        }
+        throw { ...errorData, statusCode: status, message: finalMessage }; 
       }
-      return response.json(); // No need to cast here if queryFn returns the correct type
+      return response.json(); 
     },
     select: (data) => data.data, // Selects the array of transactions from the response
     enabled: enabled, // Control query execution

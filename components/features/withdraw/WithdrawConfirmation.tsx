@@ -48,13 +48,20 @@ const truncateAddress = (address: string | null) => {
 
 export default function WithdrawConfirmation() {
   // Retrieve all necessary parameters passed from WithdrawForm
-  const { amount = '0', address = '', tokenSymbol = 'USDC', chainType = 'ethereum', blockchainNetwork = 'Base Sepolia' } = useLocalSearchParams<{
+  const { 
+    amount = '0', 
+    address = '', 
+    tokenSymbol = 'USDC', 
+    chainType = 'ethereum', 
+  } = useLocalSearchParams<{
     amount?: string;
     address?: string;
     tokenSymbol?: 'USDC'; // Adjust if other tokens are supported
     chainType?: 'ethereum' | 'solana'; // Adjust if other chains are supported
-    blockchainNetwork?: string;
   }>();
+//TODO: Chnage to Base on Prod
+  // Hardcode blockchainNetwork
+  const blockchainNetwork = 'Base Sepolia';
 
   // Use the withdrawal mutation hook
   const {

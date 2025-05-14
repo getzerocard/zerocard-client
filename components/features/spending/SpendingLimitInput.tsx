@@ -566,7 +566,7 @@ export default function SpendingLimitInput({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     // Prepare parameters for the API call
-    const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'Base Sepolia';
+    const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || '';
     console.log('[SpendingLimitInput] Using blockchain network:', blockchainNetwork);
 
     const params = {

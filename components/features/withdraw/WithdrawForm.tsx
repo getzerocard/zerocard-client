@@ -68,7 +68,7 @@ const WithdrawForm = () => {
   } = useBasenameResolver({ debounceMs: 500 });
 
   // Fetch user balance
-  const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'Base Sepolia';
+  const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || '';
   console.log('[WithdrawForm] Using blockchain network:', blockchainNetwork);
 
   const {

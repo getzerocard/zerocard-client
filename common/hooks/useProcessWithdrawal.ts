@@ -49,7 +49,6 @@ export function useProcessWithdrawal() {
         try {
           errorData = await response.json();
         } catch (e) {
-          // If we can't parse the error response, create a generic one
           errorData = {
             statusCode: response.status as WithdrawalErrorResponse['statusCode'],
             success: false,
@@ -57,33 +56,37 @@ export function useProcessWithdrawal() {
           };
         }
 
-        console.error('Withdrawal processing failed:', errorData);
+        console.error('Withdrawal processing failed (original error):', errorData); // Log original for debugging
 
-        // Map specific error cases
+        let finalMessage: string;
+
         switch (errorData.statusCode) {
           case 400:
-            throw {
-              ...errorData,
-              message: errorData.message || 'Invalid input provided for withdrawal',
-            };
+            if (errorData.message && 
+                (errorData.message.toLowerCase().includes("insufficient funds") || 
+                 errorData.message.toLowerCase().includes("exceeds the balance"))) {
+              finalMessage = "It looks like you don't have enough funds for this withdrawal. Please check your available balance and try again.";
+            } else {
+              finalMessage = "There was an issue with your withdrawal request. Please ensure all details are correct and try again.";
+            }
+            break;
           case 401:
-            throw {
-              ...errorData,
-              message: errorData.message || 'Sub-users are not allowed to make withdrawals',
-            };
+            finalMessage = "You are not authorized to make withdrawals.";
+            break;
           case 404:
-            throw {
-              ...errorData,
-              message: errorData.message || 'User not found',
-            };
+            finalMessage = "We couldn't find the necessary information for your account. Please contact support if this issue persists.";
+            break;
           case 500:
-            throw {
-              ...errorData,
-              message: errorData.message || 'Internal server error during withdrawal process',
-            };
+            finalMessage = "We're experiencing a temporary issue on our end. Please try your withdrawal again in a few moments.";
+            break;
           default:
-            throw errorData;
+            console.warn(`Unhandled error status code: ${errorData.statusCode} with original message: ${errorData.message}`);
+            finalMessage = "An unexpected error occurred while processing your withdrawal. Please try again later.";
+            break;
         }
+        // The thrown error will be caught by React Query and available in mutation.error.
+        // The message property will be our human-readable one.
+        throw { ...errorData, message: finalMessage }; 
       }
 
       const result = await response.json();
@@ -102,8 +105,9 @@ export function useProcessWithdrawal() {
       queryClient.invalidateQueries({ queryKey: ['userBalance'] });
     },
     onError: (error: WithdrawalErrorResponse) => {
-      console.error('Error processing withdrawal:', error.message);
-      // Error handling is done in the component using the error.message
+      console.error('[HOOK_useProcessWithdrawal_onError] Processed Error Message:', error.message);
+      // The error.message here should be the human-readable one set in mutationFn.
+      // The component consuming this hook will use this error.message for UI display.
     },
   });
 

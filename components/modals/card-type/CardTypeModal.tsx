@@ -60,7 +60,7 @@ const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelec
   // Animation values
   const opacity = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(100)).current;
-  const { width } = Dimensions.get('window');
+  const { width, height } = Dimensions.get('window');
 
   // Handle animations when visibility changes
   React.useEffect(() => {
@@ -118,7 +118,7 @@ const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelec
           style={[
             styles.modalAnimatedContainer,
             {
-              left: (width - 354) / 2, // Center horizontally
+              top: height * 0.5,
               opacity,
               transform: [{ translateY }],
             },
@@ -209,12 +209,11 @@ const styles = StyleSheet.create({
   },
   modalAnimatedContainer: {
     position: 'absolute',
-    top: 422, // Positioning as specified in design
-    width: 354,
+    width: '100%', // Changed from fixed width to 100%
     zIndex: 1500, // Ensure modal content is above the overlay
   },
   modalContainer: {
-    width: '100%',
+    marginHorizontal: 24, // Added horizontal margin
   },
   modalTouchable: {
     padding: 32,

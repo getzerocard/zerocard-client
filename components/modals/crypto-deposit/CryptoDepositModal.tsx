@@ -25,7 +25,7 @@ const CryptoDepositModal: React.FC<CryptoDepositModalProps> = ({ position }) => 
   const { isModalVisible, currentTransaction, setIsModalVisible } = useCryptoDepositListener();
   const opacity = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(100)).current;
-  const { width } = Dimensions.get('window');
+  const { width, height } = Dimensions.get('window');
 
   React.useEffect(() => {
     if (isModalVisible) {
@@ -69,9 +69,9 @@ const CryptoDepositModal: React.FC<CryptoDepositModalProps> = ({ position }) => 
 </svg>`;
 
   // Use position prop if provided, otherwise center horizontally
+  const defaultTopPosition = height * 0.517; // Calculate default top as 51.7% of screen height
   const positionStyle = position || {
-    left: (width - 354) / 2, // Center horizontally (354 is modal width)
-    top: 437, // Default top position
+    top: defaultTopPosition, 
   };
 
   if (!currentTransaction) return null;
@@ -92,8 +92,7 @@ const CryptoDepositModal: React.FC<CryptoDepositModalProps> = ({ position }) => 
           style={[
             styles.modalAnimatedContainer,
             {
-              left: positionStyle.left,
-              top: positionStyle.top,
+              top: positionStyle.top,    // Kept for vertical positioning
             },
             {
               opacity,
@@ -204,16 +203,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000, // Ensure overlay is below modal content
   },
   modalAnimatedContainer: {
     position: 'absolute',
-    width: 354,
+    width: '100%', // Changed from fixed width to 100%
+    zIndex: 1500, // Ensure modal content is above the overlay
   },
   modalContainer: {
-    width: '100%',
-    padding: 0,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+    width: 'auto', // Allow margin to dictate width relative to parent
+    marginHorizontal: 24, // Added horizontal margin
+    paddingHorizontal: 24, // Restored inner horizontal padding
+    paddingVertical: 32,   // Restored inner vertical padding
   },
   modalTouchable: {
     width: '100%',
