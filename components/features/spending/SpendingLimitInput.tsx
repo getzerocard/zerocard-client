@@ -15,6 +15,7 @@ import {
 import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSetSpendingLimit } from '../../../common/hooks'; // Adjusted import path
+import { useUserBalance } from '../../../common/hooks/useUserBalance'; // Import useUserBalance
 import { Button } from '../../ui/Button';
 import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner'; // Import LoadingSpinner
 
@@ -37,7 +38,6 @@ const backArrowIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="
 
 interface SpendingLimitInputProps {
   initialLimit?: number;
-  balance: number;
   onSetLimit: (limit: number) => void;
 }
 
@@ -80,7 +80,6 @@ const AnimatedDigit = ({
 
 export default function SpendingLimitInput({
   initialLimit = 0,
-  balance,
   onSetLimit,
 }: SpendingLimitInputProps) {
   const [amountString, setAmountString] = useState('0');
@@ -90,17 +89,34 @@ export default function SpendingLimitInput({
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   const isRemovingDigit = useRef(false);
 
+  // Fetch user balance
+  const blockchainNetworkEnv = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'holesky'; // Fallback to 'holesky' or your default
+  const { 
+    balances: userBalances, 
+    isLoading: isLoadingBalance, 
+    error: balanceError,
+    refetch: refetchBalance,
+  } = useUserBalance(
+    {
+      symbols: 'USDC', // Changed from ['USDC'] to 'USDC'
+      chainType: 'ethereum',
+      blockchainNetwork: blockchainNetworkEnv,
+    },
+    { enabled: true } // Fetch balance on component mount
+  );
+
+  // Extract USDC balance for the specific network
+  const usdcBalanceString = userBalances?.USDC?.[blockchainNetworkEnv] || '0';
+  const currentBalance = parseFloat(usdcBalanceString === 'Unsupported combination' ? '0' : usdcBalanceString);
+
   // Use the mutation hook
   const { mutate: setLimit, isPending: isSettingLimit, error: setError } = useSetSpendingLimit();
 
   // Format with commas but preserve decimal
   const formattedDisplay = formatWithCommas(amountString);
 
-  // Define naira conversion rate (1 USDC = X Naira)
-  const nairaConversionRate = 1450; // Example rate, should be updated with actual rate
-
   // Calculate naira equivalent
-  const nairaEquivalent = parseFloat(amountString) * nairaConversionRate;
+  const nairaEquivalent = parseFloat(amountString) * 1450; // Example rate, should be updated with actual rate
   const formattedNaira = isNaN(nairaEquivalent)
     ? '~ ₦0.00'
     : `~ ₦${nairaEquivalent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -439,8 +455,8 @@ export default function SpendingLimitInput({
 
   useEffect(() => {
     const numValue = parseFloat(amountString) || 0;
-    setIsExceedingBalance(numValue > balance);
-  }, [amountString, balance]);
+    setIsExceedingBalance(numValue > currentBalance);
+  }, [amountString, currentBalance]);
 
   // Function to create shake animation
   const shakeDisplay = () => {
@@ -506,7 +522,7 @@ export default function SpendingLimitInput({
     }
 
     const numValue = parseFloat(newAmountString) || 0;
-    if (numValue > balance) {
+    if (numValue > currentBalance) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       // Shake the amount display when exceeding balance
       shakeDisplay();
@@ -544,13 +560,13 @@ export default function SpendingLimitInput({
 
   const handleSetPercentage = (percentage: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    const calculatedAmount = balance * (percentage / 100);
+    const calculatedAmount = currentBalance * (percentage / 100);
     setAmountString(calculatedAmount.toFixed(2)); // Keep 2 decimal places
   };
 
   const handleSetMax = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    setAmountString(balance.toFixed(2)); // Use the full balance
+    setAmountString(currentBalance.toFixed(2)); // Use the full balance
   };
 
   const handleSetLimit = () => {
@@ -629,10 +645,16 @@ export default function SpendingLimitInput({
       <View style={styles.balanceWrapper}>
         <View style={styles.balanceContainer}>
           <Text style={styles.balanceLabel}>Balance</Text>
-          <View style={styles.balanceValueContainer}>
-            <SvgXml xml={usdcIconSvg} width={16} height={16} />
-            <Text style={styles.balanceAmount}>{balance.toFixed(2)} USDC</Text>
-          </View>
+          {isLoadingBalance ? (
+            <ActivityIndicator size="small" color="#FAFAFA" style={{ marginLeft: 4 }}/>
+          ) : balanceError ? (
+            <Text style={styles.balanceErrorText}>Error</Text>
+          ) : (
+            <View style={styles.balanceValueContainer}>
+              <SvgXml xml={usdcIconSvg} width={16} height={16} />
+              <Text style={styles.balanceAmount}>{currentBalance.toFixed(2)} USDC</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -871,5 +893,15 @@ const styles = StyleSheet.create({
     minHeight: 50, // Ensure button has height even when title is empty
     justifyContent: 'center', // Center spinner vertically
     alignItems: 'center', // Center spinner horizontally
+  },
+  balanceErrorText: {
+    fontFamily: 'SF Pro Text',
+    fontWeight: '500',
+    fontSize: 14,
+    lineHeight: 17,
+    textAlign: 'center',
+    letterSpacing: -0.42,
+    color: 'red',
+    marginLeft: 4,
   },
 });
