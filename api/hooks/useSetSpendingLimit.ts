@@ -10,7 +10,9 @@ interface SetSpendingLimitPayload {
 
 interface SetSpendingLimitVariables {
   userId: string;
-  payload: SetSpendingLimitPayload;
+  usdAmount: number;
+  chainType: string;
+  tokenSymbol: string;
 }
 
 // Define a more specific type if the structure of 'data' from POST response is known
@@ -33,7 +35,19 @@ export const useSetSpendingLimit = () => {
     SetSpendingLimitVariables
   >({
     mutationFn: async (variables: SetSpendingLimitVariables) => {
-      const { userId, payload } = variables;
+      const { userId, usdAmount, chainType, tokenSymbol } = variables;
+      
+      const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'Base Sepolia';
+
+      const payload: SetSpendingLimitPayload = {
+        usdAmount,
+        chainType,
+        tokenSymbol,
+        blockchainNetwork,
+      };
+
+      console.log('[useSetSpendingLimit] Attempting to set spending limit for user:', userId, 'with payload:', payload);
+      
       // Assuming apiService handles the /api/v1 prefix
       const response = await apiService.post(
         `/spending-limits/set-limit/${encodeURIComponent(userId)}`,
@@ -42,15 +56,19 @@ export const useSetSpendingLimit = () => {
       const jsonResponse: ApiResponse<SetSpendingLimitData> = await response.json();
 
       if (!jsonResponse.success || response.status >= 400) {
-        throw new Error(jsonResponse.message || `HTTP error! status: ${response.status}`);
+        console.error('[useSetSpendingLimit] API Error:', jsonResponse.message || `HTTP error! status: ${response.status}`);
+        throw new Error("Service unavailable, you can't spend your card at this moment");
       }
       return jsonResponse.data;
     },
     onSuccess: (data, variables) => {
-      // Invalidate and refetch the user query to reflect the updated spending limit
+      console.log('[useSetSpendingLimit] Spending limit set successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['user'] });
-      // You might also have a specific query for spending limits to invalidate
       // queryClient.invalidateQueries({ queryKey: ['spendingLimit', variables.userId] });
+    },
+    onError: (error) => {
+      // The error here will already have the custom message from the mutationFn
+      console.error('[useSetSpendingLimit] Error setting spending limit (hook onError):', error.message);
     },
     mutationKey: ['setSpendingLimit'],
   });

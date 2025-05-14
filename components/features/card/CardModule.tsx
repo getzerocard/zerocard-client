@@ -115,18 +115,22 @@ const CardModule: React.FC<CardModuleProps> = ({
   const walletAddress = useUserWalletAddress();
   const isAddressLoading = !walletAddress;
 
-  // Get balance using useUserBalance hook
+  // Use the balance hook
+  const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'Base Sepolia';
+  console.log('[CardModule] Using blockchain network:', blockchainNetwork);
+
   const {
     balances,
-    isLoading: isBalanceLoading
+    isLoading: isLoadingBalance,
+    error: balanceError
   } = useUserBalance({
     symbols: 'USDC',
     chainType: 'ethereum',
-    blockchainNetwork: 'Base Sepolia'
+    blockchainNetwork
   });
 
   // Get USDC balance from balances object
-  const balance = Number(balances?.USDC?.['Base Sepolia'] ?? 0);
+  const balance = Number(balances?.USDC?.[blockchainNetwork] ?? 0);
   
   // Format address for display (truncated)
   const displayedWalletAddress = React.useMemo(() => {
@@ -164,7 +168,7 @@ const CardModule: React.FC<CardModuleProps> = ({
           <Text style={styles.balanceLabel}>Your card balance is</Text>
           <View style={styles.amountRow}>
             <SvgXml xml={usdcIconSvg} width={20} height={20} />
-            {isBalanceLoading ? (
+            {isLoadingBalance ? (
               <SkeletonLoader 
                 width={80} 
                 height={24} 

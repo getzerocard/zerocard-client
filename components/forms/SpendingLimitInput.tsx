@@ -15,6 +15,7 @@ import {
 import { SvgXml } from 'react-native-svg';
 
 import { Button } from '../ui/Button';
+import { LoadingSpinner } from '../ui/feedback/LoadingSpinner';
 
 // Enable layout animations on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -37,6 +38,7 @@ interface SpendingLimitInputProps {
   initialLimit?: number;
   balance: number;
   onSetLimit: (limit: number) => void;
+  isSettingLimit?: boolean;
 }
 
 interface AnimatedDigit {
@@ -80,6 +82,7 @@ export default function SpendingLimitInput({
   initialLimit = 0,
   balance,
   onSetLimit,
+  isSettingLimit = false,
 }: SpendingLimitInputProps) {
   const [amountString, setAmountString] = useState('0');
   const [isExceedingBalance, setIsExceedingBalance] = useState(false);
@@ -638,12 +641,18 @@ export default function SpendingLimitInput({
         ))}
       </View>
 
-      <Button
-        title="Set Limit"
-        onPress={handleSetLimit}
-        style={styles.setLimitButton}
-        disabled={isZero || isExceedingBalance}
-      />
+      {isSettingLimit ? (
+        <View style={[styles.setLimitButton, styles.loadingButtonContainer]}> 
+          <LoadingSpinner size="small" color="#000000" useLottie={false} />
+        </View>
+      ) : (
+        <Button
+          title="Set Limit"
+          onPress={handleSetLimit}
+          style={styles.setLimitButton}
+          disabled={isZero || isExceedingBalance || isSettingLimit}
+        />
+      )}
     </View>
   );
 }
@@ -796,5 +805,12 @@ const styles = StyleSheet.create({
   setLimitButton: {
     marginTop: 36, // Push button to the bottom
     width: '100%', // Take full width
+  },
+  loadingButtonContainer: {
+    height: 49,
+    backgroundColor: '#A0A0A0',
+    borderRadius: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

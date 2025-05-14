@@ -83,8 +83,11 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   showSpendingLimit,
 }) => {
   const [biometricsEnabled, setBiometricsEnabled] = useState(true);
-  const { notificationsEnabled, toggleNotifications } = useSettingsStore();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const privy = usePrivy();
+
+  // Only keep username since we're using email and phone from props
+  const username = fullName;
 
   const handleHelpPress = () => {
     Linking.openURL('https://www.zerocard.com/help');

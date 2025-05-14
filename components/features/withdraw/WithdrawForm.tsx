@@ -18,7 +18,6 @@ import { Button } from '../../ui/Button';
 import { useBasenameResolver } from '../../../common/hooks/useBasenameResolver';
 import * as Clipboard from 'expo-clipboard';
 import { isValidAddress, isBasenameWithSuffix } from '../../../common/utils/basenameResolver';
-import { useProcessWithdrawal } from '../../../common/hooks/useProcessWithdrawal';
 import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner';
 import { useUserBalance } from '../../../common/hooks/useUserBalance';
 
@@ -68,14 +67,10 @@ const WithdrawForm = () => {
     reset: resetBasenameResolver,
   } = useBasenameResolver({ debounceMs: 500 });
 
-  // Use the withdrawal mutation hook
-  const {
-    mutate: processWithdrawal,
-    isPending: isProcessingWithdrawal,
-    error: withdrawalError,
-  } = useProcessWithdrawal();
-
   // Fetch user balance
+  const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || '';
+  console.log('[WithdrawForm] Using blockchain network:', blockchainNetwork);
+
   const {
     balances,
     isLoading: isLoadingBalance,
@@ -83,11 +78,11 @@ const WithdrawForm = () => {
   } = useUserBalance({
     symbols: 'USDC',
     chainType: 'ethereum',
-    blockchainNetwork: 'Base Sepolia'
+    blockchainNetwork
   });
 
   // Get USDC balance from balances object - properly handle the nested structure
-  const availableWithdrawalAmount = Number(balances?.USDC?.['Base Sepolia'] ?? 0);
+  const availableWithdrawalAmount = Number(balances?.USDC?.[blockchainNetwork] ?? 0);
 
   // When resolution fails, trigger error haptic and log the failure
   useEffect(() => {
@@ -136,8 +131,15 @@ const WithdrawForm = () => {
   const handlePaste = async () => {
     try {
       const text = await Clipboard.getStringAsync();
-      handleAddressChange(text);
-      console.log('Paste pressed', text);
+      if (text) {
+        handleAddressChange(text);
+        console.log('Pasted from clipboard:', text);
+        
+        // Add haptic feedback for successful paste
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        console.log('Nothing to paste - clipboard empty');
+      }
     } catch (error) {
       console.error('Failed to paste from clipboard:', error);
     }
@@ -186,107 +188,43 @@ const WithdrawForm = () => {
   // --- Navigation Handler ---
   const handleProceedToConfirmation = () => {
     // Determine the address to use (either resolved or direct)
-    const finalAddress = resolvedAddress || '';
+    const finalAddress = resolvedAddress || (isValidAddress(addressInput) ? addressInput : '');
 
     // Basic validation
-    if (!finalAddress) {
-      alert('Please enter a valid address or basename.'); // Or show inline error
-      return;
-    }
-    const numericAmount = parseFloat(amountInput);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-      alert('Please enter a valid withdrawal amount.');
-      return;
-    }
-    if (isAmountError) {
-        alert('Withdrawal amount cannot exceed available balance.');
-        return;
-    }
-
-    // Navigate to confirmation screen
-    router.push({
-      pathname: '/withdraw-funds/confirm-withdrawal',
-      params: { 
-        amount: amountInput, // Send raw amount
-        address: finalAddress 
-      },
-    });
-  };
-  // --- ---
-
-  const handleProcessWithdrawal = () => {
-    const finalAddress = resolvedAddress || (isValidAddress(addressInput) ? addressInput : '');
-    const numericAmount = parseFloat(amountInput);
-
     if (!finalAddress) {
       Alert.alert('Error', 'Please enter a valid address or basename.');
       return;
     }
+    const numericAmount = parseFloat(amountInput);
     if (isNaN(numericAmount) || numericAmount <= 0) {
       Alert.alert('Error', 'Please enter a valid withdrawal amount.');
       return;
     }
     if (isAmountError) {
-      Alert.alert('Error', 'Withdrawal amount cannot exceed available balance.');
-      return;
+        Alert.alert('Error', 'Withdrawal amount cannot exceed available balance.');
+        return;
     }
 
-    const params = {
-      tokenSymbol: 'USDC' as const,
-      amount: amountInput, // API expects string
-      recipientAddress: finalAddress,
-      chainType: 'ethereum' as const,
-      blockchainNetwork: 'Base Sepolia', // Using Base Sepolia
-    };
-
-    console.log('Processing withdrawal with params:', params);
-    processWithdrawal(params, {
-      onSuccess: (data) => {
-        console.log('Withdrawal successful:', data);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert(
-          'Success',
-          `Withdrawal of ${data.data.amount} ${data.data.tokenSymbol} to ${truncateAddress(data.data.to)} initiated.\nTransaction Hash: ${truncateAddress(data.data.transactionHash)}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigate back or to a confirmation screen
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace('/(tab)/home');
-                }
-              },
-            },
-          ]
-        );
-      },
-      onError: (error: any) => {
-        console.error('Withdrawal failed:', error);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        
-        // Handle specific error cases
-        let errorMessage = 'An unexpected error occurred.';
-        if (error.response?.status === 400) {
-          errorMessage = error.response?.data?.message || 'Invalid input or insufficient balance.';
-        } else if (error.response?.status === 401) {
-          errorMessage = 'Unauthorized. Please log in again.';
-        } else if (error.response?.status === 500) {
-          errorMessage = 'Server error. Please try again later.';
-        }
-        
-        Alert.alert('Withdrawal Failed', errorMessage);
+    // Navigate to confirmation screen with all necessary params
+    router.push({
+      pathname: '/withdraw-funds/confirm-withdrawal',
+      params: {
+        amount: amountInput, // Send raw amount
+        address: finalAddress,
+        tokenSymbol: 'USDC', // Assuming USDC for now, make dynamic if needed
+        chainType: 'ethereum', // Assuming ethereum, make dynamic if needed
+        blockchainNetwork,
       },
     });
   };
+  // --- ---
 
   return (
     <View style={styles.outerContainer}>
       {/* Header Row */}
       <View style={styles.headerRow}>
         <Text style={styles.title}>Withdraw funds</Text>
-        <TouchableOpacity onPress={handleClose} disabled={isProcessingWithdrawal}>
+        <TouchableOpacity onPress={handleClose}>
           <SvgXml xml={closeIconSvg} width={24} height={24} />
         </TouchableOpacity>
       </View>
@@ -311,9 +249,9 @@ const WithdrawForm = () => {
               onChangeText={handleAddressChange}
               autoCapitalize="none"
               autoCorrect={false}
-              editable={!isProcessingWithdrawal}
+              editable={true}
             />
-            <TouchableOpacity style={styles.innerButton} onPress={handlePaste} disabled={isProcessingWithdrawal}>
+            <TouchableOpacity style={styles.innerButton} onPress={handlePaste}>
               <Text style={styles.innerButtonText}>Paste</Text>
             </TouchableOpacity>
           </SquircleView>
@@ -330,7 +268,7 @@ const WithdrawForm = () => {
                fillColor: '#333333',
             }}
           >
-            <TouchableOpacity style={styles.innerButton} disabled={isProcessingWithdrawal}>
+            <TouchableOpacity style={styles.innerButton}>
                <SvgXml xml={usdcIconSvg} width={16} height={16} />
                <Text style={styles.innerButtonText}>USDC</Text>
             </TouchableOpacity>
@@ -341,7 +279,7 @@ const WithdrawForm = () => {
               keyboardType="decimal-pad"
               value={formatDisplayAmount(amountInput)}
               onChangeText={handleAmountChange}
-              editable={!isProcessingWithdrawal}
+              editable={true}
             />
           </SquircleView>
         </View>
@@ -361,19 +299,15 @@ const WithdrawForm = () => {
        <Button
             title="Withdraw" // Title is overridden by children, but good for accessibility
             variant="primary" // Assuming primary style from Button.tsx
-            onPress={handleProcessWithdrawal} // Navigate on press
+            onPress={handleProceedToConfirmation} // Navigate on press, changed from handleProcessWithdrawal
             style={styles.withdrawButton} // Apply specific styles
-            disabled={isProcessingWithdrawal || isAmountError || !amountInput || (addressStatus !== 'found' && addressStatus !== 'direct_address')} // Example disable logic
+            disabled={isAmountError || !amountInput || (addressStatus !== 'found' && addressStatus !== 'direct_address')} // Example disable logic, removed isProcessingWithdrawal
        >
             {/* Custom content for the button with padlock */}
-            {isProcessingWithdrawal ? (
-                <LoadingSpinner size="small" color="#000000" />
-            ) : (
-                <View style={styles.buttonContent}>
-                    <SvgXml xml={padlockSvg} width={16} height={16} />
-                    <Text style={styles.withdrawButtonText}>Withdraw</Text>
-                </View>
-            )}
+            <View style={styles.buttonContent}>
+                <SvgXml xml={padlockSvg} width={16} height={16} />
+                <Text style={styles.withdrawButtonText}>Withdraw</Text>
+            </View>
        </Button>
     </View>
   );

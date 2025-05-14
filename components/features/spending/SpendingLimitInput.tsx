@@ -566,12 +566,14 @@ export default function SpendingLimitInput({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     // Prepare parameters for the API call
-    // TODO: Replace hardcoded values with dynamic ones from user context/selection
+    const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || '';
+    console.log('[SpendingLimitInput] Using blockchain network:', blockchainNetwork);
+
     const params = {
       usdAmount: limitValue,
-      chainType: 'ethereum' as const, // Example value
-      tokenSymbol: 'USDC' as const, // Example value
-      blockchainNetwork: 'Base', // Example value
+      chainType: 'ethereum' as const,
+      tokenSymbol: 'USDC' as const,
+      blockchainNetwork,
     };
 
     console.log('Calling setLimit mutation with params:', params);

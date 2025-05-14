@@ -1,11 +1,22 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { SquircleView } from 'react-native-figma-squircle';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
 
-import { Button } from '../../../components/ui/Button'; // Assuming Button component path
+import { Button } from '../../ui/Button'; // Corrected path
+import { useProcessWithdrawal } from '../../../common/hooks/useProcessWithdrawal'; // Import the hook
+import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner'; // Import LoadingSpinner
 
 // --- SVG Icons ---
 // Replace with actual SVG content or imports
@@ -36,12 +47,32 @@ const truncateAddress = (address: string | null) => {
 };
 
 export default function WithdrawConfirmation() {
-  const { amount = '0', address = '' } = useLocalSearchParams<{
+  // Retrieve all necessary parameters passed from WithdrawForm
+  const { 
+    amount = '0', 
+    address = '', 
+    tokenSymbol = 'USDC', 
+    chainType = 'ethereum', 
+  } = useLocalSearchParams<{
     amount?: string;
     address?: string;
+    tokenSymbol?: 'USDC'; // Adjust if other tokens are supported
+    chainType?: 'ethereum' | 'solana'; // Adjust if other chains are supported
   }>();
+//TODO: Chnage to Base on Prod
+  // Hardcode blockchainNetwork
+  const blockchainNetwork = 'Base Sepolia';
+
+  // Use the withdrawal mutation hook
+  const {
+    mutate: processWithdrawal,
+    isPending: isProcessingWithdrawal,
+    error: withdrawalError,
+  } = useProcessWithdrawal();
 
   const handleBack = () => {
+    if (isProcessingWithdrawal) return; // Don't allow back navigation while processing
+
     if (router.canGoBack()) {
       router.back();
     } else {
@@ -51,18 +82,46 @@ export default function WithdrawConfirmation() {
   };
 
   const handleConfirm = () => {
-    console.log('Confirming withdrawal:', { amount, address });
-    // Add actual withdrawal API call here
-    // On success, navigate to home with toast parameters
-    router.replace({
-      pathname: '/(tab)/home',
-      params: {
-        showWithdrawalToast: 'true',
-        amount: amount as string,
-        address: address as string,
+    console.log('Confirming withdrawal with params:', { amount, address, tokenSymbol, chainType, blockchainNetwork });
+
+    if (!address || !amount || !tokenSymbol || !chainType || !blockchainNetwork) {
+      Alert.alert('Error', 'Missing withdrawal details.');
+      return;
+    }
+
+    const params = {
+      tokenSymbol,
+      amount,
+      recipientAddress: address,
+      chainType,
+      blockchainNetwork,
+    };
+
+    processWithdrawal(params, {
+      onSuccess: (data) => {
+        console.log('Withdrawal successful:', data);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Pass success info back to the home screen for a toast/message
+        router.replace({
+          pathname: '/(tab)/home',
+          params: {
+            showWithdrawalToast: 'true',
+            amount: data.data.amount,
+            address: data.data.to,
+            txHash: data.data.transactionHash,
+          },
+        });
+      },
+      onError: (error) => {
+        console.error('Withdrawal failed:', error);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Withdrawal Failed', error.message || 'An unexpected error occurred.');
       },
     });
   };
+
+  // Log the loading state to debug spinner visibility
+  console.log('[WithdrawConfirmation] isProcessingWithdrawal:', isProcessingWithdrawal);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -88,6 +147,10 @@ export default function WithdrawConfirmation() {
               Confirm withdrawal of {amount} USDC to{'\n'}
               {truncateAddress(address)}
             </Text>
+            {/* Display API error message if present */}
+            {withdrawalError && (
+                <Text style={styles.errorText}>{withdrawalError.message}</Text>
+            )}
           </View>
 
           <View style={styles.detailsSection}>
@@ -111,7 +174,7 @@ export default function WithdrawConfirmation() {
                   <SvgXml xml={chainIconSvg} width={18} height={18} />
                   <Text style={styles.detailLabel}>Chain</Text>
                 </View>
-                <Text style={styles.detailValue}>Base</Text>
+                <Text style={styles.detailValue}>{blockchainNetwork}</Text>
               </View>
               <View style={styles.detailRow}>
                 <View style={styles.detailLabelContainer}>
@@ -132,26 +195,31 @@ export default function WithdrawConfirmation() {
               }}>
               <SvgXml xml={infoCircleSvg} width={24} height={24} />
               <Text style={styles.warningText}>
-                Only withdraw to an address on Base, this wallet currently only holds USDC asset on
-                Base
+                Only withdraw to an address on {blockchainNetwork}, this wallet currently only holds USDC asset on
+                {blockchainNetwork}
               </Text>
             </SquircleView>
           </View>
         </View>
 
         <View style={styles.footer}>
-          <Button
-            title="Confirm withdrawal"
-            variant="primary"
+          <TouchableOpacity
+            style={[
+              styles.confirmButtonBase,
+              isProcessingWithdrawal ? styles.confirmButtonDisabled : styles.confirmButtonActive,
+            ]}
             onPress={handleConfirm}
-            style={styles.confirmButton} // Ensure button stretches
+            disabled={isProcessingWithdrawal}
           >
-            {/* Custom content for the button with padlock */}
-            <View style={styles.buttonContent}>
-              <SvgXml xml={padlockSvg} width={16} height={16} />
-              <Text style={styles.confirmButtonText}>Confirm withdrawal</Text>
-            </View>
-          </Button>
+            {isProcessingWithdrawal ? (
+              <LoadingSpinner size="small" color="#000000" useLottie={false} />
+            ) : (
+              <View style={styles.buttonContent}>
+                <SvgXml xml={padlockSvg} width={16} height={16} />
+                <Text style={styles.confirmButtonText}>Confirm withdrawal</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -205,6 +273,13 @@ const styles = StyleSheet.create({
     lineHeight: 24, // 120%
     color: '#FFFFFF',
   },
+  errorText: {
+    fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'sans-serif',
+    fontSize: 14,
+    color: '#FF4E57', // Error color
+    marginTop: 8,
+    textAlign: 'left',
+  },
   detailsSection: {
     gap: 16,
     alignSelf: 'stretch',
@@ -255,17 +330,24 @@ const styles = StyleSheet.create({
     color: '#989898',
   },
   footer: {
-    // Styles for footer container if needed, padding is handled by scrollContainer
+    paddingHorizontal: 16, // Add horizontal padding to match Button's typical container
   },
-  confirmButton: {
-    width: '100%', // Make button fill width
-    // Override default button width if necessary
-    height: 49, // Height from CSS
-    paddingHorizontal: 16, // Padding from CSS
-    paddingVertical: 0, // Adjust vertical padding if needed
+  confirmButtonBase: {
+    width: '100%',
+    height: 49,
+    borderRadius: 100, // Assuming a squircle-like button from Button component
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+  },
+  confirmButtonActive: {
+    backgroundColor: '#40FF00', // Active color from typical primary button
+  },
+  confirmButtonDisabled: {
+    backgroundColor: '#A0A0A0', // Disabled color
   },
   buttonContent: {
-    // Style for content inside the button
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
