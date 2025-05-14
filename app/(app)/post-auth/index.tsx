@@ -8,17 +8,25 @@ export default function PostAuthScreen() {
   const router = useRouter();
   const { isLoadingUserCreation } = useUserContext();
 
-  // Auto-navigate to home screen after user creation is complete with an additional delay
+  // Auto-navigate to home screen after user creation is complete
   useEffect(() => {
     let timer: NodeJS.Timeout;
+    // Only proceed if user creation is done
     if (!isLoadingUserCreation) {
+      console.log('[PostAuthScreen] User creation complete. Proceeding to home after delay.');
       timer = setTimeout(() => {
-        console.log('Proceeding to home after post-auth');
+        console.log('[PostAuthScreen] Navigating to home.');
         router.push('/(tab)/home');
-      }, 3000); // 3 seconds delay (2s base + 1s additional) after user creation is complete
+      }, 3000); // 3 seconds delay
+    } else {
+      // This else block can be simplified or removed if no specific logging is needed for the loading state here
+      console.log('[PostAuthScreen] Waiting for user creation to complete...');
     }
 
-    return () => clearTimeout(timer);
+    return () => {
+      // console.log('[PostAuthScreen] useEffect cleanup: Clearing timer.'); // Optional: less verbose logging
+      clearTimeout(timer);
+    };
   }, [isLoadingUserCreation, router]);
 
   // Show loading state

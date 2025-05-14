@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useApiService } from '../../../../api/api';
 import { ValidationStatus } from '../../../../types/username';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 
 interface UsernameCheckResponse {
   available: boolean;
@@ -14,20 +14,18 @@ interface ApiEnvelope {
   data: UsernameCheckResponse;
 }
 
-// Cache for username validation results
-const validationCache = new Map<string, { result: UsernameCheckResponse; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 const DEBOUNCE_DELAY = 300; // 300ms debounce
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes for React Query gcTime
 
 // Custom debounce implementation
 function useDebounce<T extends (...args: any[]) => Promise<any>>(
   callback: T,
   delay: number
 ): T {
-  let timeoutId: NodeJS.Timeout;
+  let timeoutId: NodeJS.Timeout | undefined;
 
   return useCallback(
-    ((...args) => {
+    ((...args: any[]) => {
       return new Promise((resolve, reject) => {
         if (timeoutId) {
           clearTimeout(timeoutId);
@@ -49,81 +47,66 @@ function useDebounce<T extends (...args: any[]) => Promise<any>>(
 
 export function useCheckUsername(username: string) {
   const apiService = useApiService();
+  const trimmedUsername = username.trim();
 
-  // Base query function
-  const baseQueryFn = useCallback(async () => {
-    if (!username || username.length === 0) {
-      return { available: false, isEmpty: true } as any;
-    }
-
-    // Check cache first
-    const cached = validationCache.get(username);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      console.log(`[useCheckUsername] Using cached result for username: '${username}'`);
-      return cached.result;
-    }
-
+  // Debounced actual API call function
+  const debouncedFetchUsernameAvailability = useDebounce(async (currentUsername: string) => {
+    console.log(`[useCheckUsername] Debounced API call for username: '${currentUsername}'`);
     try {
-      const response = await apiService.get(`/users/check-username/${username}`);
+      const response = await apiService.get(`/users/check-username/${currentUsername}`);
       const fullResponse: ApiEnvelope = await response.json();
 
       if (fullResponse && typeof fullResponse.data === 'object' && typeof fullResponse.data.available === 'boolean') {
-        // Update cache
-        validationCache.set(username, {
-          result: fullResponse.data,
-          timestamp: Date.now(),
-        });
         return fullResponse.data;
       }
-
       console.error('[useCheckUsername] Invalid API response structure:', fullResponse);
       throw new Error('Invalid API response structure for username check');
     } catch (error) {
-      console.error(`[useCheckUsername] Error checking username '${username}':`, error);
+      console.error(`[useCheckUsername] Error in API call for username '${currentUsername}':`, error);
       throw error;
     }
-  }, [username, apiService]);
+  }, DEBOUNCE_DELAY);
 
-  // Debounced query function
-  const debouncedQueryFn = useDebounce(baseQueryFn, DEBOUNCE_DELAY);
-
-  const { data, error: queryError, isLoading } = useQuery<UsernameCheckResponse, Error, UsernameCheckResponse, [string, string]>({
-    queryKey: ['username', username],
-    queryFn: debouncedQueryFn,
-    enabled: username.length > 0,
+  const { data, error: queryError, isLoading, isFetching } = useQuery<
+    UsernameCheckResponse,
+    Error,
+    UsernameCheckResponse,
+    [string, string]
+  >({
+    queryKey: ['usernameCheck', trimmedUsername],
+    queryFn: () => debouncedFetchUsernameAvailability(trimmedUsername),
+    enabled: trimmedUsername.length > 0,
     staleTime: 30000,
     gcTime: CACHE_TTL,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
-  // Derive status directly from query state
   const { status, error } = useMemo(() => {
-    let currentStatus: ValidationStatus = 'empty';
-    let currentError: string | null = null;
-
-    if (!username || username.length === 0) {
-      currentStatus = 'empty';
-      console.log(`[useCheckUsername] Status: ${currentStatus} (Username is empty)`);
-    } else if (isLoading) {
-      currentStatus = 'checking';
-      console.log(`[useCheckUsername] Status: ${currentStatus} (Checking username: '${username}')`);
-    } else if (queryError) {
-      currentStatus = 'empty';
-      currentError = queryError instanceof Error ? queryError.message : 'Failed to check username availability';
-      console.log(`[useCheckUsername] Status: ${currentStatus} (Error checking username: '${username}'), Error: ${currentError}`);
-    } else if (data) {
-      if ((data as any).isEmpty) {
-        currentStatus = 'empty';
-        console.log(`[useCheckUsername] Status: ${currentStatus} (Data indicates empty for username: '${username}')`);
-      } else {
-        currentStatus = data.available ? 'available' : 'taken';
-        console.log(`[useCheckUsername] Status: ${currentStatus} (Username: '${username}' is ${currentStatus === 'available' ? 'available based on API' : 'taken based on API'}) API raw available: ${data.available}`);
-      }
+    if (trimmedUsername.length === 0) {
+      return { status: 'empty' as ValidationStatus, error: null };
     }
+    if (isFetching) {
+      return { status: 'checking' as ValidationStatus, error: null };
+    }
+    if (queryError) {
+      return {
+        status: 'empty' as ValidationStatus,
+        error: queryError instanceof Error ? queryError.message : 'Failed to check username',
+      };
+    }
+    if (data) {
+      return {
+        status: data.available ? 'available' as ValidationStatus : 'taken' as ValidationStatus,
+        error: null,
+      };
+    }
+    return { status: 'empty' as ValidationStatus, error: null };
+  }, [trimmedUsername, isFetching, queryError, data]);
 
-    return { status: currentStatus, error: currentError };
-  }, [username, isLoading, queryError, data]);
+  useEffect(() => {
+    console.log(`[useCheckUsername] Input: '${username}', Trimmed: '${trimmedUsername}', Status: ${status}, Error: ${error}, isLoading: ${isLoading}, isFetching: ${isFetching}, API_Data:`, data);
+  }, [username, trimmedUsername, status, error, isLoading, isFetching, data]);
 
   return { status, error };
 }

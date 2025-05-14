@@ -8,14 +8,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { useFonts } from 'expo-font';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { useOrderCardStore, OrderAddressDetails } from '../../store/orderCardStore';
 import { router } from 'expo-router';
+import { useUpdateUser } from '../../api/hooks/useUpdateUser';
 
 // Import close icon SVG
 const closeIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -55,6 +56,7 @@ interface AddressData {
   fullAddress?: string;
   longitude?: number;
   latitude?: number;
+  country?: string;
 }
 
 interface AutocompleteResult {
@@ -66,6 +68,7 @@ interface AutocompleteResult {
     postcode?: string;
     lon: number;
     lat: number;
+    country?: string;
   };
 }
 
@@ -86,6 +89,7 @@ const useAddressStore = create<AddressState>((set) => ({
 }));
 
 const ADDRESS_DRAFT_KEY = 'ADDRESS_DRAFT_DATA';
+const DEFAULT_POSTAL_CODE = '000000';
 
 // Nigerian states
 const NIGERIAN_STATES = [
@@ -146,8 +150,10 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
   const [postalCode, setPostalCode] = useState('');
   const [showStateDropdown, setShowStateDropdown] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isUpdatingUser, setIsUpdatingUser] = useState(false);
 
   const { suggestions, selectedAddress, setSuggestions, setSelectedAddress, clearSuggestions } = useAddressStore();
+  const updateUserMutation = useUpdateUser();
 
   const streetRef = useRef<TextInput>(null);
   const cityRef = useRef<TextInput>(null);
@@ -186,7 +192,7 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
         console.log('Fetching autocomplete suggestions for:', street);
         const apiKey = '814bd5638efd4a89916668f1c2905fdf'; // Replace with secure storage in production
         const response = await fetch(
-          `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(street)}&apiKey=${apiKey}&limit=5`
+          `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(street)}&apiKey=${apiKey}&limit=5&filter=countrycode:ng`
         );
         console.log('API response status:', response.status);
         if (!response.ok) {
@@ -227,17 +233,22 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    if (isUpdatingUser) return;
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    const finalPostalCode = postalCode.trim() === '' ? DEFAULT_POSTAL_CODE : postalCode;
 
     const currentAddressData: AddressData = {
       street,
       city,
       state,
-      postalCode,
+      postalCode: finalPostalCode,
       fullAddress: selectedAddress?.properties.formatted,
       longitude: selectedAddress?.properties.lon,
       latitude: selectedAddress?.properties.lat,
+      country: selectedAddress?.properties.country || 'Nigeria',
     };
 
     // Save to the new orderCardStore
@@ -249,10 +260,40 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
       postalCode: currentAddressData.postalCode,
     };
     setShippingAddress(orderAddressDetails);
+    console.log('[ShippingAddress] Address saved to orderCardStore:', orderAddressDetails);
 
-    // Call the onContinue prop if provided
-    if (onContinue) {
-      onContinue(currentAddressData);
+    // Prepare payload for updateUserMutation
+    const updateUserPayload = {
+      shippingAddress: {
+        street: currentAddressData.street,
+        city: currentAddressData.city,
+        state: currentAddressData.state,
+        postalCode: currentAddressData.postalCode,
+        country: currentAddressData.country,
+      },
+    };
+
+    try {
+      setIsUpdatingUser(true);
+      console.log('[ShippingAddress] Calling updateUserMutation with payload:', updateUserPayload);
+      await updateUserMutation.mutateAsync({ payload: updateUserPayload });
+      console.log('[ShippingAddress] updateUserMutation successful.');
+
+      // Call the onContinue prop if provided, after successful user update
+      if (onContinue) {
+        onContinue(currentAddressData);
+      }
+    } catch (error) {
+      console.error('[ShippingAddress] updateUserMutation failed:', error);
+      // Handle error appropriately (e.g., show a toast to the user)
+      // For now, we'll allow onContinue to proceed even if update fails, 
+      // but this might need review based on product requirements.
+      if (onContinue) {
+        console.warn('[ShippingAddress] Proceeding despite user update failure.');
+        onContinue(currentAddressData);
+      }
+    } finally {
+      setIsUpdatingUser(false);
     }
   };
 
@@ -260,7 +301,12 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
   const saveDraft = async () => {
     try {
       if (street || city || state || postalCode) {
-        const draftData = { street, city, state, postalCode };
+        const draftData = {
+          street,
+          city,
+          state,
+          postalCode: postalCode.trim() === '' ? DEFAULT_POSTAL_CODE : postalCode,
+        };
         await AsyncStorage.setItem(ADDRESS_DRAFT_KEY, JSON.stringify(draftData));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.navigate('/');
@@ -405,8 +451,16 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
           </View>
         </View>
 
-        <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-          <Text style={styles.continueButtonText}>Continue</Text>
+        <TouchableOpacity 
+          style={[styles.continueButton, isUpdatingUser && styles.disabledButton]} 
+          onPress={handleContinue}
+          disabled={isUpdatingUser}
+        >
+          {isUpdatingUser ? (
+            <ActivityIndicator color="#000000" />
+          ) : (
+            <Text style={styles.continueButtonText}>Continue</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.saveDraftButton} onPress={saveDraft}>
@@ -605,6 +659,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 16,
     color: '#000000',
+  },
+  disabledButton: {
+    backgroundColor: '#B0B0B0',
   },
   saveDraftButton: {
     flexDirection: 'row',

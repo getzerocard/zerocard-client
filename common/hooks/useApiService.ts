@@ -4,8 +4,15 @@ import { useAccessTokenProvider } from '../../app/(app)/context/accessTokenConte
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://[::1]:3000/api/v1';
 
 export function useApiService() {
+  console.log('[useApiService] Hook starting...');
+  
+  console.log('[useApiService] Calling useIdentityTokenProvider...');
   const { getIdentityToken } = useIdentityTokenProvider();
+  console.log('[useApiService] useIdentityTokenProvider returned.');
+  
+  console.log('[useApiService] Calling useAccessTokenProvider...');
   const { getAccessToken } = useAccessTokenProvider();
+  console.log('[useApiService] useAccessTokenProvider returned.');
 
   const fetchWithTokens = async (
     endpoint: string,

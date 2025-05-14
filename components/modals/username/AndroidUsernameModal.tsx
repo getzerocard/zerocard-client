@@ -24,96 +24,78 @@ import { SquircleView } from 'react-native-figma-squircle';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '../../ui/Button';
 import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner';
-import { useCheckUsername } from './hooks/useCheckUsername';
 import BlurBackground from '../../ui/layout/BlurBackground';
-
 import { CommonModalProps } from './hooks/useUsernameModal';
 
-type AndroidUsernameModalProps = CommonModalProps;
-
-// Device detection utility
 const useDeviceDetection = () => {
-  const window = Dimensions.get('window');
-  const screen = Dimensions.get('screen');
+  const windowDim = Dimensions.get('window');
+  const screenDim = Dimensions.get('screen');
   const insets = useSafeAreaInsets();
   
   return useMemo(() => {
-    const isSmallDevice = window.width < 375;
-    const isMediumDevice = window.width >= 375 && window.width < 414;
-    const isLargeDevice = window.width >= 414;
+    const { width, height } = windowDim;
+    const isSmallDevice = width < 375;
+    // const isMediumDevice = width >= 375 && width < 414; // Example, not directly used by modalPositionPercentage logic below
+    // const isLargeDevice = width >= 414; // Example
     
-    const isShortDevice = window.height < 700;
-    const isTallDevice = window.height > 800;
-    
-    // Calculate modal position based on device characteristics
+    const isShortDevice = height < 700;
+    // const isTallDevice = height > 800; // Example
+        
     let modalPositionPercentage = 0.6; // Default for medium devices
-    
     if (isSmallDevice && isShortDevice) {
-      modalPositionPercentage = 0.5; // Center on small and short devices
-    } else if (isLargeDevice && isTallDevice) {
+      modalPositionPercentage = 0.5; 
+    } else if (width >= 414 && height > 800) { // Example for large & tall
       modalPositionPercentage = 0.62;
     }
     
     return {
-      window,
-      screen,
+      window: windowDim,
+      screen: screenDim,
       insets,
-      isSmallDevice,
-      isMediumDevice,
-      isLargeDevice,
-      isShortDevice,
-      isTallDevice,
       modalPositionPercentage,
-      statusBarHeight: StatusBar.currentHeight || 0,
+      // statusBarHeight: StatusBar.currentHeight || 0, // Not directly used by component from props
     };
-  }, [window, screen, insets]);
+  }, [windowDim, screenDim, insets]);
 };
 
 const AndroidUsernameModal: React.FC<CommonModalProps> = ({
   visible,
   onClose,
   onSubmit,
-  initialUsername = '',
+  currentUsername,
+  onUsernameInputChange,
+  usernameStatus,
+  isLoadingCheck,
+  checkError,
+  submissionError,
+  isLoadingSubmit,
 }) => {
-  const [username, setUsername] = useState(initialUsername);
-  const [loading, setLoading] = useState(false);
   const [hasSetUsername, setHasSetUsername] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   
-  // Create a ref for the text input
   const inputRef = useRef<TextInput>(null);
-  
-  // Use device detection
   const deviceInfo = useDeviceDetection();
   const { window: { width: screenWidth, height: screenHeight }, modalPositionPercentage } = deviceInfo;
   
-  // Animation values
   const translateY = useSharedValue(screenHeight);
   const opacity = useSharedValue(0);
   const modalPosition = useSharedValue(0);
   
-  // Memoized values
   const modalContentWidth = useMemo(() => screenWidth * 0.9, [screenWidth]);
   const modalTopPosition = useMemo(() => 
     screenHeight * modalPositionPercentage, 
     [screenHeight, modalPositionPercentage]
   );
 
-  const { status, error } = useCheckUsername(username);
-
-  // Function to force keyboard to appear (particularly helpful for Samsung devices)
   const forceShowKeyboard = useCallback(() => {
     if (Platform.OS === 'android') {
       if (inputRef.current) {
         console.log('[AndroidUsernameModal] Force showing keyboard for Samsung device');
-        // Try multiple focus attempts with slight delays
         inputRef.current.blur();
         setTimeout(() => {
           if (inputRef.current) {
             inputRef.current.focus();
-            // Some Samsung devices need a second attempt
             setTimeout(() => {
               if (inputRef.current) inputRef.current.focus();
             }, 100);
@@ -123,38 +105,29 @@ const AndroidUsernameModal: React.FC<CommonModalProps> = ({
     }
   }, []);
   
-  // Add Samsung-specific keyboard workaround
   useEffect(() => {
     if (visible && Platform.OS === 'android') {
       const backHandler = Keyboard.addListener('keyboardDidHide', () => {
-        // Check if we still need the keyboard (modal is visible and input was focused)
         if (visible && isKeyboardVisible) {
           console.log('[AndroidUsernameModal] Keyboard unexpectedly hidden, trying to restore it');
           forceShowKeyboard();
         }
       });
-      
-      return () => {
-        backHandler.remove();
-      };
+      return () => backHandler.remove();
     }
   }, [visible, isKeyboardVisible, forceShowKeyboard]);
 
-  // Make status bar transparent when modal is visible
   useEffect(() => {
     if (visible) {
       StatusBar.setTranslucent(true);
       StatusBar.setBackgroundColor('transparent');
     } else {
-      // Reset to default when modal is hidden (optional - depends on app's needs)
       if (Platform.OS === 'android') {
         StatusBar.setTranslucent(false);
         StatusBar.setBackgroundColor('#f7f7f7');
       }
     }
-    
     return () => {
-      // Reset on unmount
       if (Platform.OS === 'android') {
         StatusBar.setTranslucent(false);
         StatusBar.setBackgroundColor('#f7f7f7');
@@ -162,75 +135,44 @@ const AndroidUsernameModal: React.FC<CommonModalProps> = ({
     };
   }, [visible]);
 
-  // Reset hasSetUsername when modal becomes visible
   useEffect(() => {
     if (visible) {
       setHasSetUsername(false);
-      // Trigger show animations
-      opacity.value = withTiming(1, {
-        duration: 300,
-        easing: Easing.out(Easing.ease),
-      });
-      translateY.value = withSpring(0, {
-        damping: 15,
-        stiffness: 100,
-      });
-      
-      // Samsung device fix: try to focus the input after modal appears
+      opacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.ease) });
+      translateY.value = withSpring(0, { damping: 15, stiffness: 100 });
       const focusTimer = setTimeout(() => {
         if (inputRef.current) {
           console.log('[AndroidUsernameModal] Attempting to focus input after modal appears');
           inputRef.current.focus();
         }
       }, 500);
-      
       return () => clearTimeout(focusTimer);
     } else {
-      // Trigger hide animations
-      opacity.value = withTiming(0, {
-        duration: 200,
-        easing: Easing.in(Easing.ease),
-      });
-      translateY.value = withSpring(screenHeight, {
-        damping: 15,
-        stiffness: 100,
-      });
+      opacity.value = withTiming(0, { duration: 200, easing: Easing.in(Easing.ease) });
+      translateY.value = withSpring(screenHeight, { damping: 15, stiffness: 100 });
     }
     console.log('[AndroidUsernameModal] Visibility changed (useEffect). New visible state:', visible);
   }, [visible, opacity, translateY, screenHeight]);
 
-  // Handle keyboard show/hide with animations
   useEffect(() => {
-    // Use different event names based on platform
     const keyboardShowEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const keyboardHideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
     const keyboardShowListener = Keyboard.addListener(keyboardShowEvent, (event) => {
       console.log('[AndroidUsernameModal] Keyboard show event');
       setKeyboardVisible(true);
-      
-      // Calculate how much to move the modal up based on keyboard height and screen size
       const keyboardHeight = event.endCoordinates.height;
-      const inputBottom = screenHeight * modalPositionPercentage + 200; // Approximate position of input bottom
+      const inputBottom = screenHeight * modalPositionPercentage + 200;
       const visibleAreaWithKeyboard = screenHeight - keyboardHeight;
       const needsToMoveUp = inputBottom > visibleAreaWithKeyboard;
-      
-      // Move up enough to keep the input field visible
       const moveUpDistance = needsToMoveUp ? -(inputBottom - visibleAreaWithKeyboard + 50) : 0;
-      
-      modalPosition.value = withTiming(moveUpDistance, {
-        duration: 300,
-        easing: Easing.out(Easing.ease),
-      });
+      modalPosition.value = withTiming(moveUpDistance, { duration: 300, easing: Easing.out(Easing.ease) });
     });
 
     const keyboardHideListener = Keyboard.addListener(keyboardHideEvent, () => {
       console.log('[AndroidUsernameModal] Keyboard hide event');
       setKeyboardVisible(false);
-      modalPosition.value = withTiming(0, {
-        duration: 300,
-        easing: Easing.out(Easing.ease),
-      });
+      modalPosition.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
     });
 
     return () => {
@@ -239,66 +181,51 @@ const AndroidUsernameModal: React.FC<CommonModalProps> = ({
     };
   }, [modalPosition, screenHeight, modalPositionPercentage]);
 
-  // Memoized styles
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const modalStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }, { translateY: modalPosition.value }] }));
 
-  const modalStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: translateY.value },
-      { translateY: modalPosition.value },
-    ],
-  }));
-
-  // Memoized handlers
   const handlePressSetUsernameButton = useCallback(async () => {
-    console.log('[AndroidUsernameModal] "Set Username" button pressed. Current local username:', username);
-    const trimmedUsername = username.trim();
+    console.log('[AndroidUsernameModal] "Set Username" button pressed. Current username from props:', currentUsername);
 
-    if (!trimmedUsername || trimmedUsername.length === 0) {
+    if (!currentUsername || currentUsername.trim().length === 0) {
       console.log('[AndroidUsernameModal] Username is empty locally. Alerting user.');
       Alert.alert('Username Required', 'Please enter a username to continue.', [{ text: 'OK' }]);
       return;
     }
 
-    setLoading(true);
     try {
-      console.log('[AndroidUsernameModal] Calling onSubmit with username:', trimmedUsername);
-      await onSubmit(trimmedUsername);
+      console.log('[AndroidUsernameModal] Calling onSubmit (from useUsernameModal) with username:', currentUsername);
+      await onSubmit(currentUsername);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setHasSetUsername(true);
     } catch (e) {
-      console.log('[AndroidUsernameModal] onSubmit (from useUsernameModal) threw an error. Error should be handled in useUsernameModal.', e);
+      console.log('[AndroidUsernameModal] onSubmit (from useUsernameModal) threw an error. Error should be handled by useUsernameModal or displayed via submissionError prop.', e);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setLoading(false);
     }
-  }, [username, onSubmit]);
+  }, [currentUsername, onSubmit]);
 
-  const handleClose = useCallback(() => {
-    console.log('[AndroidUsernameModal] handleClose called (local). hasSetUsername:', hasSetUsername);
-    if (!hasSetUsername && visible) {
+  const handleCloseLocal = useCallback(() => {
+    console.log('[AndroidUsernameModal] handleCloseLocal called. hasSetUsername:', hasSetUsername);
+    if (!hasSetUsername && visible && currentUsername.trim().length === 0) {
       console.log('[AndroidUsernameModal] Attempting to close modal via overlay/back without setting username. Alerting.');
-      Alert.alert('Username Required', 'Please set a username before continuing.', [
-        { text: 'OK' },
-      ]);
+      Alert.alert('Username Required', 'Please set a username before continuing.', [{ text: 'OK' }]);
     } else {
       onClose();
     }
-  }, [hasSetUsername, visible, onClose]);
+  }, [hasSetUsername, visible, onClose, currentUsername]);
 
   const handleTextChange = useCallback((text: string) => {
     console.log('[AndroidUsernameModal] TextInput onChangeText. New text:', text);
-    setUsername(text);
-  }, []);
+    onUsernameInputChange(text);
+  }, [onUsernameInputChange]);
 
-  console.log('[AndroidUsernameModal] Render. visible prop:', visible);
+  console.log('[AndroidUsernameModal] Render. visible prop:', visible, 'usernameStatus from props:', usernameStatus);
 
   return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={handleClose} statusBarTranslucent={true}>
+    <Modal transparent visible={visible} animationType="none" onRequestClose={handleCloseLocal} statusBarTranslucent={true}>
       <BlurBackground visible={visible} intensity={40} tint="dark" />
       
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={handleClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={handleCloseLocal}>
         <Animated.View
           style={[
             styles.modalAnimatedContainer,
@@ -329,8 +256,8 @@ const AndroidUsernameModal: React.FC<CommonModalProps> = ({
                 <View style={styles.contentContainer}>
                   <View style={styles.titleContainer}>
                     <Text style={styles.heyText}>Hey,</Text>
-                    {username ? (
-                      <Text style={styles.nameText}>{username}</Text>
+                    {currentUsername ? (
+                      <Text style={styles.nameText}>{currentUsername}</Text>
                     ) : (
                       <Text style={styles.placeholderNameText}>pick a name</Text>
                     )}
@@ -358,7 +285,7 @@ const AndroidUsernameModal: React.FC<CommonModalProps> = ({
                             style={styles.textInput}
                             placeholder="Enter a unique name"
                             placeholderTextColor="#787878"
-                            value={username}
+                            value={currentUsername}
                             onChangeText={handleTextChange}
                             onFocus={() => {
                               console.log('[AndroidUsernameModal] TextInput onFocus.');
@@ -372,7 +299,6 @@ const AndroidUsernameModal: React.FC<CommonModalProps> = ({
                             autoCorrect={false}
                             returnKeyType="done"
                             blurOnSubmit={true}
-                            // Additional Samsung-specific fixes
                             caretHidden={false}
                             keyboardType="visible-password"
                             contextMenuHidden={false}
@@ -385,26 +311,37 @@ const AndroidUsernameModal: React.FC<CommonModalProps> = ({
                       </TouchableOpacity>
                     </SquircleView>
 
-                    {status !== 'empty' && (
+                    {submissionError && (
                       <View style={styles.statusContainer}>
-                        {status === 'checking' && (
+                        <Ionicons name="alert-circle-outline" size={16} color="#C9252D" />
+                        <Text style={styles.statusText}>{submissionError}</Text>
+                      </View>
+                    )}
+
+                    {!submissionError && usernameStatus !== 'empty' && (
+                      <View style={styles.statusContainer}>
+                        {isLoadingCheck && (
                           <>
                             <LoadingSpinner size={16} color="#2D2D2D" style={{ padding: 0 }} />
                             <Text style={styles.statusText}>Checking</Text>
                           </>
                         )}
-
-                        {status === 'available' && (
+                        {!isLoadingCheck && usernameStatus === 'available' && (
                           <>
                             <Ionicons name="checkmark-circle" size={16} color="#33CD00" />
                             <Text style={styles.statusText}>Your display name is available 🫡</Text>
                           </>
                         )}
-
-                        {status === 'taken' && (
+                        {!isLoadingCheck && usernameStatus === 'taken' && (
                           <>
                             <Ionicons name="close-circle" size={16} color="#C9252D" />
                             <Text style={styles.statusText}>Your unique name is taken 😏</Text>
+                          </>
+                        )}
+                        {!isLoadingCheck && checkError && usernameStatus !== 'available' && usernameStatus !== 'taken' && (
+                          <>
+                            <Ionicons name="warning-outline" size={16} color="#FF8C00" />
+                            <Text style={styles.statusText}>{checkError}</Text>
                           </>
                         )}
                       </View>
@@ -417,14 +354,14 @@ const AndroidUsernameModal: React.FC<CommonModalProps> = ({
                   squircleParams={{
                     cornerSmoothing: 1,
                     cornerRadius: 100000,
-                    fillColor: loading ? '#A0A0A0' : '#40FF00',
+                    fillColor: (isLoadingSubmit || usernameStatus !== 'available') ? '#A0A0A0' : '#40FF00',
                   }}>
                   <TouchableOpacity 
                     style={styles.button} 
                     onPress={handlePressSetUsernameButton}
-                    disabled={loading || status !== 'available'}
+                    disabled={isLoadingSubmit || usernameStatus !== 'available'}
                   >
-                    {loading ? (
+                    {isLoadingSubmit ? (
                       <LoadingSpinner size="small" color="#000000" style={{ padding: 0 }} />
                     ) : (
                       <Text style={styles.buttonText}>Set username</Text>

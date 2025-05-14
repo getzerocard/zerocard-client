@@ -38,6 +38,8 @@ const AndroidUsernameModal: React.FC<AndroidUsernameModalProps> = ({
   onSetUsername,
   initialUsername = '',
 }) => {
+  return null;
+
   const [username, setUsername] = useState(initialUsername);
   const [validationStatus, setValidationStatus] = useState<ValidationStatus>('idle');
   const { height } = Dimensions.get('window');

@@ -1,27 +1,34 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { View, StyleSheet, ScrollView, Text, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+// import { useFocusEffect } from '@react-navigation/native'; // Removed as it's not used
 import ProfileHeader from '../../../components/features/profile/ProfileHeader';
 import BasenameDialog from '../../../components/modals/basename/BasenameDialog';
 import ProfileSettings from '../../../components/features/profile/ProfileSettings';
 import { useGetUser } from '../../../api/hooks/useGetUser';
 
 export default function ProfileScreen() {
+  console.log('[ProfileScreen] Component rendering');
   const insets = useSafeAreaInsets();
-  const { data: user, isLoading, error, refetch } = useGetUser();
-
-  useFocusEffect(
-    useCallback(() => {
-      refetch();
-    }, [refetch])
-  );
+  const { data: userResponse, isLoading, error } = useGetUser(); // Renamed user to userResponse for clarity
 
   const profileData = React.useMemo(() => {
-    if (!user?.data) return { fullName: 'Not set', email: 'Not set', phone: 'Not set', username: 'User', spendingLimitDisplay: 'Not set', rawData: null, showSpendingLimit: true };
-    const { firstName, lastName, email, phoneNumber, username, cardOrderStatus, cardId } = user.data;
-    const fullName = ( (firstName || '') + ' ' + (lastName || '') ).trim() || 'Not set';
-    
+    const actualUserData = userResponse?.data;
+
+    if (!actualUserData) {
+      return {
+        fullName: 'Not set',
+        email: 'Not set',
+        phone: 'Not set',
+        username: 'User',
+        spendingLimitDisplay: 'Not set', // Default display when no data
+        rawData: null,
+        showSpendingLimit: true, // Default to true if no specific card data
+      };
+    }
+
+    const { firstName, lastName, email, phoneNumber, username, cardOrderStatus, cardId } = actualUserData;
+    const fullName = ((firstName || '') + ' ' + (lastName || '')).trim() || 'Not set';
     const showSpendingLimit = !(cardOrderStatus === "not_ordered" && cardId === null);
 
     return {
@@ -29,11 +36,11 @@ export default function ProfileScreen() {
       email: email || 'Not set',
       phone: phoneNumber || 'Not set',
       username: username || 'User',
-      spendingLimitDisplay: '500 USDC Limit',
-      rawData: user.data,
+      spendingLimitDisplay: '500 USDC Limit', // Maintained as per existing behavior
+      rawData: actualUserData,
       showSpendingLimit,
     };
-  }, [user]);
+  }, [userResponse]);
 
   if (isLoading) {
     return (
@@ -45,6 +52,8 @@ export default function ProfileScreen() {
   }
 
   if (error) {
+    // Log the full error object for better debugging
+    console.error("[ProfileScreen] Error loading profile:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     return (
       <SafeAreaView style={[styles.container, styles.centered]} edges={['right', 'left']}>
         <Text>Error loading profile. Please try again.</Text>
