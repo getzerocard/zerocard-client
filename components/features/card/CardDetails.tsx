@@ -45,10 +45,10 @@ const sudoElementStyles = (isIOS: boolean) => ({
 });
 
 const getSudoFieldHtml = (
-  type: 'PAN' | 'EXP' | 'CVV',
+  type: 'PAN' | 'CVV' | 'PIN',
   cardTokenFromApi: string, 
   cardId: string,
-  customStyles: any | null, // Allow customStyles to be null
+  customStyles: any | null,
   enableCopyButton: boolean = false
 ) => {
   // TODO: Change vaultId to 'vdl2xefo5' for Live environment before deployment
@@ -62,28 +62,28 @@ const getSudoFieldHtml = (
   switch (type) {
     case 'PAN':
       fieldName = 'pan-text';
-      apiPath = `/cards/${cardId}/secure-data/number`; // Matches Sudo example
-      jsonPath = 'data.number'; // Matches Sudo example
+      apiPath = `/cards/${cardId}/secure-data/number`;
+      jsonPath = 'data.number';
       includeCopyButton = enableCopyButton;
       break;
-    case 'EXP':
-      fieldName = 'exp-text';
-      // CRITICAL TODO: Verify the correct apiPath and jsonPathSelector for Expiry Date with Sudo documentation/support.
-      // The example at https://docs.sudo.africa/docs/displaying-sensitive-card-data does NOT show Expiry for show.request().
-      // The previous implementation used sudoShow.EXP.run(), which might be different.
-      // Assuming a hypothetical path and selector for now.
-      apiPath = `/cards/${cardId}/secure-data/expiryDate`; // HYPOTHETICAL - VERIFY!
-      jsonPath = 'data.formattedExpiry'; // HYPOTHETICAL - VERIFY! (e.g., MM/YY)
-      includeCopyButton = enableCopyButton;
+    case 'PIN':
+      fieldName = 'pin-text';
+      apiPath = `/cards/${cardId}/secure-data/defaultPin`;
+      jsonPath = 'data.defaultPin';
+      includeCopyButton = false;
       break;
     case 'CVV':
       fieldName = 'cvv-text';
-      apiPath = `/cards/${cardId}/secure-data/cvv2`; // Matches Sudo example
-      jsonPath = 'data.cvv2'; // Matches Sudo example
+      apiPath = `/cards/${cardId}/secure-data/cvv2`;
+      jsonPath = 'data.cvv2';
       includeCopyButton = false; 
       break;
     default:
-      console.error('[getSudoFieldHtml] Invalid field type provided:', type);
+      // Ensure the 'type' in the error message reflects the valid types.
+      // This line is not strictly necessary for runtime if TypeScript catches it,
+      // but good for explicitness if somehow an invalid type slips through in JS.
+      const exhaustiveCheck: never = type;
+      console.error('[getSudoFieldHtml] Invalid field type provided:', exhaustiveCheck);
       return '<html><body>Error: Invalid field type for Sudo SecureProxy.</body></html>';
   }
 
@@ -116,14 +116,11 @@ const getSudoFieldHtml = (
       fieldIframe.render('#sudo-field-container');
 
     } catch (e) {
-      // It's good practice to at least log this to the console if it happens,
-      // even if we can't easily send it back to RN without a working postMessage.
       console.error('[Sudo SecureProxy Init Error]', { 
-        field: '${type.toLowerCase()}', 
+        field: '${type.toLowerCase()}', // type here will be one of PAN, CVV, PIN
         error: e.message || 'Initialization Error', 
         details: e.stack 
       });
-      // Attempt to notify RN, though if postMessage itself is broken, this won't work.
       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'initError', field: '${type.toLowerCase()}', error: e.message || 'Initialization Error', details: e.stack }));
       }
@@ -246,7 +243,7 @@ export default function CardDetails({}: CardDetailsProps) {
   const maskedValue = "••••";
 
   const renderSensitiveField = (
-    type: 'PAN' | 'EXP' | 'CVV',
+    type: 'PAN' | 'CVV' | 'PIN',
     label: string,
     enableSudoCopy: boolean = false
   ) => {
@@ -355,8 +352,8 @@ export default function CardDetails({}: CardDetailsProps) {
         <View style={styles.divider} />
         
         <View style={styles.detailSection}>
-          <Text style={styles.detailLabel}>Valid until</Text>
-          {renderSensitiveField('EXP', 'Expiry date', true)}
+          <Text style={styles.detailLabel}>Default PIN</Text> 
+          {renderSensitiveField('PIN', 'Default PIN', false)}
         </View>
         <View style={styles.divider} />
         

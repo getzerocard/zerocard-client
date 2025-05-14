@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Animated, { 
   useSharedValue, 
@@ -10,6 +10,8 @@ import Animated, {
   withRepeat,
   Easing 
 } from 'react-native-reanimated';
+import { useGetWeeklySpendingSummary } from '../../../api/hooks/useGetWeeklySpendingSummary';
+import { DailySpending, DayOfWeek } from '../../../types/transactions';
 
 // USDC Icon Component
 const USDCIcon = () => (
@@ -157,30 +159,88 @@ const AnimatedBar = ({
   );
 };
 
+const dayKeyToLabelMapping: Record<DayOfWeek, string> = {
+  S: 'Sunday',
+  M: 'Monday',
+  T: 'Tuesday',
+  W: 'Wednesday',
+  T2: 'Thursday',
+  F: 'Friday',
+  S2: 'Saturday',
+};
+
+// Order of days for the chart
+const dayOrder: DayOfWeek[] = ['S', 'M', 'T', 'W', 'T2', 'F', 'S2'];
+
 const SpendingHabit = () => {
-  const barData = [
-    { height: 36, day: 'S', amount: 23.45, label: 'Sunday' },
-    { height: 64, day: 'M', amount: 42.19, label: 'Monday' },
-    { height: 71, day: 'T', amount: 47.32, label: 'Tuesday' },
-    { height: 57, day: 'W', amount: 36.78, label: 'Wednesday' },
-    { height: 87, day: 'T', amount: 58.93, label: 'Thursday' },
-    { height: 54, day: 'F', amount: 35.12, label: 'Friday' },
-    { height: 71, day: 'S', amount: 47.29, label: 'Saturday' },
-  ];
+  const { 
+    data: spendingSummary, 
+    isLoading, 
+    isError, 
+    error 
+  } = useGetWeeklySpendingSummary();
   
   const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
-  
+
   const handleBarPress = (index: number) => {
     setSelectedDayIndex(selectedDayIndex === index ? null : index);
   };
 
-  // Calculate weekly total
-  const weeklyTotal = barData.reduce((sum, item) => sum + item.amount, 0);
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#878787" />
+        <Text style={styles.loadingText}>Loading spending habits...</Text>
+      </View>
+    );
+  }
 
+  if (isError || !spendingSummary) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorText}>
+          Could not load spending habits. {error?.message}
+        </Text>
+      </View>
+    );
+  }
+
+  const { 
+    totalSpentThisWeek, 
+    currency, 
+    changeFromLastWeek, 
+    dailySpending, 
+    highlightDay 
+  } = spendingSummary;
+
+  // Transform dailySpending into barData format
+  // We'll use a max height for bars, e.g., 100, and scale amounts accordingly
+  // or use amounts directly if they are within a reasonable visual range.
+  // For now, let's find the max spending to scale heights appropriately.
+  const spendingAmounts = dayOrder.map(day => dailySpending[day] || 0);
+  const maxSpending = Math.max(...spendingAmounts, 1); // Avoid division by zero if all are 0
+  const chartMaxHeight = 87; // Max height of a bar in pixels from original static data
+
+  const barData = dayOrder.map((dayKey, index) => {
+    const amount = dailySpending[dayKey] || 0;
+    // Scale height: (amount / maxSpending) * chartMaxHeight
+    // If maxSpending is 0, all heights are 0.
+    // If amount is 0, height is 0.
+    const height = maxSpending > 0 ? (amount / maxSpending) * chartMaxHeight : 0;
+    
+    return {
+      height: Math.max(height, 5), // Ensure a minimum visible height for bars with small amounts
+      day: dayKey.replace('2', ''), // Display 'T' for 'T2', 'S' for 'S2'
+      amount: amount,
+      label: dayKeyToLabelMapping[dayKey],
+      isApiHighlighted: dayKey === highlightDay,
+    };
+  });
+  
   // Determine displayed amount and title based on selection
   const displayedAmount = selectedDayIndex !== null 
     ? barData[selectedDayIndex].amount 
-    : weeklyTotal;
+    : totalSpentThisWeek;
     
   const displayedTitle = selectedDayIndex !== null 
     ? `Total spent ${barData[selectedDayIndex].label}`
@@ -201,17 +261,22 @@ const SpendingHabit = () => {
           <View style={styles.amountRow}>
             <USDCIcon />
             <Text style={styles.amountText}>
-              {displayedAmount.toFixed(2)} USDC
+              {displayedAmount.toFixed(2)} {currency}
             </Text>
           </View>
           
           <View style={styles.spentInfo}>
             <Text style={styles.spentText}>{displayedTitle}</Text>
             
-            {selectedDayIndex === null && (
+            {selectedDayIndex === null && changeFromLastWeek && (
               <View style={styles.changeContainer}>
-                <ArrowUpIcon />
-                <Text style={styles.increaseText}>1.6%</Text>
+                {changeFromLastWeek.isIncrease ? <ArrowUpIcon /> : <ArrowDownIconSimilarToUp />} 
+                <Text style={[
+                  styles.increaseText, 
+                  !changeFromLastWeek.isIncrease && styles.decreaseText
+                ]}>
+                  {changeFromLastWeek.percentage.toFixed(1)}%
+                </Text>
                 <Text style={styles.spentText}>from last week</Text>
               </View>
             )}
@@ -225,7 +290,7 @@ const SpendingHabit = () => {
               <AnimatedBar 
                 height={item.height} 
                 delay={index * 100} 
-                isHighest={index === 4} 
+                isHighest={item.isApiHighlighted} 
                 index={index}
                 day={item.day}
                 amount={item.amount}
@@ -234,7 +299,8 @@ const SpendingHabit = () => {
               />
               <Text style={[
                 styles.dayText, 
-                selectedDayIndex === index && styles.selectedDayText
+                selectedDayIndex === index && styles.selectedDayText,
+                item.isApiHighlighted && styles.highlightedDayText // Style for API highlighted day
               ]}>
                 {item.day}
               </Text>
@@ -251,6 +317,26 @@ const SpendingHabit = () => {
     </View>
   );
 };
+
+// Placeholder for ArrowDownIcon - you'll need to create or import a real one
+const ArrowDownIconSimilarToUp = () => (
+  <Svg width={14} height={14} viewBox="0 0 14 14" fill="none" style={{ transform: [{ rotate: '180deg' }] }}>
+    <Path
+      d="M7 3.5L7 10.5"
+      stroke="#FF4040" // Example color for decrease
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M3.5 7L7 3.5L10.5 7"
+      stroke="#FF4040" // Example color for decrease
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -304,6 +390,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
+    flexWrap: 'wrap', // Allow text to wrap if needed
   },
   spentText: {
     fontFamily: 'System',
@@ -325,17 +412,19 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around', // Use space-around for better distribution
     alignItems: 'flex-end',
     width: '100%',
-    gap: 16,
-    height: 114,
+    // gap: 16, // gap might be too much with space-around, adjust as needed
+    height: 114, // Keep original height
   },
   dayColumn: {
     flexDirection: 'column',
     alignItems: 'center',
     gap: 8,
-    width: 28,
+    // width: 28, // Width will be determined by space-around and number of items
+    flex: 1, // Allow columns to take equal space
+    maxWidth: 40, // Max width for a bar column
   },
   dayText: {
     fontFamily: 'System',
@@ -355,8 +444,30 @@ const styles = StyleSheet.create({
     color: '#000000', // Black color for "Fin AI®"
   },
   selectedDayText: {
-    color: '#40FF00',
+    color: '#40FF00', // Color for selected day text
     fontWeight: '700',
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 200, // Ensure container has some height for centered content
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#878787',
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    textAlign: 'center',
+  },
+  decreaseText: {
+    color: '#FF4040', // Example color for decrease percentage
+  },
+  highlightedDayText: { // Style for the day label that is API highlighted
+    fontWeight: 'bold',
+    // color: '#40FF00', // Already handled by selectedDayText if also selected
   },
 });
 

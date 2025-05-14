@@ -14,7 +14,6 @@ export default function SpendingLimitScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ backPath?: string }>(); // Get local search params
   const [currentLimit, setCurrentLimit] = useState(1000); // Mock current limit
-  const [userBalance, setUserBalance] = useState(2500); // Mock user balance
 
   const handleBack = () => {
     if (params.backPath) {
@@ -52,7 +51,6 @@ export default function SpendingLimitScreen() {
       {/* Replace the previous content with the SpendingLimitInput component */}
       <SpendingLimitInput 
         initialLimit={currentLimit}
-        balance={userBalance}
         onSetLimit={handleSetNewLimit}
       />
     </SafeAreaView>

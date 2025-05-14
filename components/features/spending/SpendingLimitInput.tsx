@@ -16,8 +16,10 @@ import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSetSpendingLimit } from '../../../common/hooks'; // Adjusted import path
 import { useUserBalance } from '../../../common/hooks/useUserBalance'; // Import useUserBalance
+import { useGetTokenRate } from '../../../common/hooks/useGetTokenRate'; // Import useGetTokenRate
 import { Button } from '../../ui/Button';
 import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner'; // Import LoadingSpinner
+import { SkeletonLoader } from '../../ui/feedback/SkeletonLoader'; // Import SkeletonLoader
 
 // Enable layout animations on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -38,7 +40,6 @@ const backArrowIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="
 
 interface SpendingLimitInputProps {
   initialLimit?: number;
-  balance: number;
   onSetLimit: (limit: number) => void;
 }
 
@@ -81,9 +82,9 @@ const AnimatedDigit = ({
 
 export default function SpendingLimitInput({
   initialLimit = 0,
-  balance,
   onSetLimit,
 }: SpendingLimitInputProps) {
+  console.log('[SpendingLimitInput] Component rendering');
   const [amountString, setAmountString] = useState('0');
   const [isExceedingBalance, setIsExceedingBalance] = useState(false);
   const [animatedDigits, setAnimatedDigits] = useState<AnimatedDigit[]>([]);
@@ -100,28 +101,67 @@ export default function SpendingLimitInput({
     refetch: refetchBalance,
   } = useUserBalance(
     {
-      symbols: 'USDC', // Changed from ['USDC'] to 'USDC'
+      symbols: 'USDC', 
       chainType: 'ethereum',
       blockchainNetwork: blockchainNetworkEnv,
     },
-    { enabled: true } // Fetch balance on component mount
+    { enabled: true } 
   );
 
-  // Extract USDC balance for the specific network
   const usdcBalanceString = userBalances?.USDC?.[blockchainNetworkEnv] || '0';
   const currentBalance = parseFloat(usdcBalanceString === 'Unsupported combination' ? '0' : usdcBalanceString);
 
   // Use the mutation hook
   const { mutate: setLimit, isPending: isSettingLimit, error: setError } = useSetSpendingLimit();
 
-  // Format with commas but preserve decimal
-  const formattedDisplay = formatWithCommas(amountString);
+  let rateData, isLoadingRate, rateError;
+  try {
+    console.log('[SpendingLimitInput] TRYING to call useGetTokenRate...');
+    const hookResult = useGetTokenRate(
+      { token: 'USDC', fiat: 'NGN' },
+      { enabled: true } 
+    );
+    rateData = hookResult.data;
+    isLoadingRate = hookResult.isLoading;
+    rateError = hookResult.error;
+    console.log('[SpendingLimitInput] SUCCESSFULLY called useGetTokenRate. isLoadingRate:', isLoadingRate, 'rateError:', rateError);
+  } catch (e: any) {
+    console.error('[SpendingLimitInput] CRITICAL ERROR calling useGetTokenRate:', e);
+    console.error('[SpendingLimitInput] Error message:', e.message);
+    console.error('[SpendingLimitInput] Error stack:', e.stack);
+    // Set error states manually if the hook call itself fails catastrophically
+    rateData = undefined;
+    isLoadingRate = false;
+    rateError = e; 
+  }
 
-  // Calculate naira equivalent
-  const nairaEquivalent = parseFloat(amountString) * 1450; // Example rate, should be updated with actual rate
-  const formattedNaira = isNaN(nairaEquivalent)
-    ? '~ ₦0.00'
-    : `~ ₦${nairaEquivalent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formattedDisplay = formatWithCommas(amountString);
+  const [nairaEquivalent, setNairaEquivalent] = useState('~ ₦0.00');
+
+  useEffect(() => {
+    const enteredAmount = parseFloat(amountString);
+    if (isNaN(enteredAmount) || enteredAmount === 0 || !rateData?.effectiveRate || isLoadingRate || rateError) {
+      setNairaEquivalent('~ ₦0.00');
+      return;
+    }
+
+    try {
+      const effectiveRate = parseFloat(rateData.effectiveRate);
+      if (isNaN(effectiveRate)) {
+        console.error('[SpendingLimitInput] Invalid effective rate from hook:', rateData.effectiveRate);
+        setNairaEquivalent('~ ₦ (Error)');
+        return;
+      }
+      
+      const calculatedNairaValue = enteredAmount * effectiveRate;
+      
+      setNairaEquivalent(`~ ₦${calculatedNairaValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+
+    } catch (e) {
+      console.error('[SpendingLimitInput] Error calculating Naira equivalent:', e);
+      setNairaEquivalent('~ ₦ (Error)');
+    }
+  }, [amountString, rateData, isLoadingRate, rateError]); // Depend on rateData object
 
   function formatWithCommas(value: string): string {
     // Handle zero case specifically
@@ -674,7 +714,15 @@ export default function SpendingLimitInput({
             <Text style={[styles.amountDisplay, isZero ? styles.amountDisplayEmpty : null]}>0</Text>
           )}
         </View>
-        <Text style={styles.nairaEquivalent}>{formattedNaira}</Text>
+        {isLoadingRate ? (
+          <View style={styles.nairaEquivalentLoadingContainer}> 
+            <SkeletonLoader width={100} height={16} borderRadius={4} />
+          </View>
+        ) : rateError ? (
+          <Text style={styles.nairaEquivalent}>~ ₦ (Rate Error)</Text>
+        ) : (
+          <Text style={styles.nairaEquivalent}>{nairaEquivalent}</Text>
+        )}
         {setError && (
            <Text style={styles.errorText}>Error: {setError.message}</Text>
         )}
@@ -823,6 +871,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     color: '#838383',
+    minHeight: 19, // Ensure consistent height with or without text
+  },
+  nairaEquivalentLoadingContainer: { // Style for the skeleton loader container
+    marginTop: 8,
+    alignItems: 'center', // Center skeleton if its width is fixed
+    minHeight: 19, // Match nairaEquivalent style
   },
   percentageButtonsContainer: {
     flexDirection: 'row',
