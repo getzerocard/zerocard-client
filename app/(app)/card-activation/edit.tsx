@@ -82,8 +82,8 @@ export default function EditScreen() {
 
     // Validate card number
     const cardDigitsOnly = cardNumber.replace(/\D/g, '');
-    if (cardDigitsOnly.length !== 16) {
-      setCardNumberError('Card number must be 16 digits');
+    if (cardDigitsOnly.length < 18 || cardDigitsOnly.length > 19) {
+      setCardNumberError('Card number must be 18 or 19 digits');
       isValid = false;
     } else {
       setCardNumberError('');
@@ -203,7 +203,7 @@ export default function EditScreen() {
                   onChangeText={handleCardNumberChange}
                   placeholder="XXXX XXXX XXXX XXXX"
                   keyboardType="number-pad"
-                  maxLength={19} // 16 digits + 3 spaces
+                  maxLength={23} // 19 digits + 4 spaces
                   placeholderTextColor="#9A9A9A"
                 />
                 {cardNumberError ? <Text style={styles.errorText}>{cardNumberError}</Text> : null}

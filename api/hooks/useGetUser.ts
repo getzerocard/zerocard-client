@@ -7,7 +7,8 @@ const STORAGE_KEY = 'user_profile';
 // Type for the actual user profile data
 export type UserProfile = {
   username: string;
-  id?: string;
+  id?: string; // This is the application-specific UUID
+  userId?: string; // This will hold the Privy DID (e.g., did:privy:...)
   firstName?: string;
   lastName?: string;
   email?: string;

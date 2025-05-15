@@ -16,7 +16,7 @@ import { SvgXml } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSetSpendingLimit } from '../../../common/hooks'; // Adjusted import path
 import { useUserBalance } from '../../../common/hooks/useUserBalance'; // Import useUserBalance
-import { useGetTokenRate } from '../../../common/hooks/useGetTokenRate'; // Import useGetTokenRate
+import { useGetTokenRate } from '../../../common/hooks'; // Changed path to use index.ts
 import { Button } from '../../ui/Button';
 import { LoadingSpinner } from '../../ui/feedback/LoadingSpinner'; // Import LoadingSpinner
 import { SkeletonLoader } from '../../ui/feedback/SkeletonLoader'; // Import SkeletonLoader

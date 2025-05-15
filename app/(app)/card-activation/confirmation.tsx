@@ -1,19 +1,61 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, /* ActivityIndicator, */ Alert } from 'react-native'; // Commented out ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack, useLocalSearchParams } from 'expo-router';
 import { SvgXml } from 'react-native-svg';
 import { ParamListBase } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { backIconSvg, cardEditIconSvg } from '../../../constants/icons'; // Import icons
+import { useMapCard } from '../../../api/hooks/useMapCard'; // Import the hook
+import { MapCardRequestParams, MappedCardData } from '../../../types/card'; // Import request params type and MappedCardData
+import { useGetUser, UserProfile, UserApiResponse } from '../../../api/hooks/useGetUser'; // Import useGetUser and its types
+import { LoadingSpinner } from '../../../components/ui/feedback/LoadingSpinner'; // Import LoadingSpinner
+
+// Helper function to convert MM/YY to MMM-YYYY
+const formatExpiryDateForApi = (mmYY: string): string => {
+  if (!mmYY || !mmYY.includes('/')) return ''; // Basic validation
+  const [month, yearSuffix] = mmYY.split('/');
+  if (!month || !yearSuffix || month.length !== 2 || yearSuffix.length !== 2) return '';
+
+  const monthNumber = parseInt(month, 10);
+  if (isNaN(monthNumber) || monthNumber < 1 || monthNumber > 12) return '';
+
+  const year = parseInt(`20${yearSuffix}`, 10); 
+
+  const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const monthAbbreviation = monthNames[monthNumber - 1];
+
+  return `${monthAbbreviation}-${year}`;
+};
 
 export default function ConfirmationScreen() {
+  console.log('[ConfirmationScreen] Component rendered.');
+
   const router = useRouter();
   const params = useLocalSearchParams<{
     cardNumber?: string;
     expDate?: string;
     cvv?: string;
   }>();
+
+  const { 
+    data: getUserData, 
+    isLoading: isLoadingUser, 
+    isError: isGetUserError, 
+    error: getUserError,
+    refetch: refetchUser
+  } = useGetUser();
+
+  const { mutate: mapCardMutateFn, reset: resetMapCardMutation, isPending: isMappingCard } = useMapCard();
+
+  useEffect(() => {
+    console.log('[ConfirmationScreen] useGetUser state update: isLoadingUser:', isLoadingUser, 'isGetUserError:', isGetUserError);
+    if (!isLoadingUser && !isGetUserError && getUserData) {
+      console.log('[ConfirmationScreen] User data fetched successfully. User ID:', getUserData.data?.id, 'Full data:', JSON.stringify(getUserData.data));
+    } else if (isGetUserError) {
+      console.error('[ConfirmationScreen] Error fetching user data:', getUserError);
+    }
+  }, [getUserData, isLoadingUser, isGetUserError, getUserError]);
 
   const cardNumber = params.cardNumber || '';
   const expDate = params.expDate || '';
@@ -39,19 +81,82 @@ export default function ConfirmationScreen() {
   };
 
   const handleSetPin = () => {
-    if (isDataComplete) {
-      router.push('/(app)/card-activation/set-pin');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    console.log('[ConfirmationScreen] handleSetPin called. isLoadingUser:', isLoadingUser);
+
+    if (isLoadingUser) {
+      Alert.alert(
+        'Loading User Data',
+        'User information is still loading. Please wait a moment and try again.'
+      );
+      return;
     }
+
+    if (isGetUserError || !getUserData || !getUserData.data || !getUserData.data.userId) {
+      console.error('[ConfirmationScreen] Privy User DID (userId field) missing or error fetching user. getUserData:', JSON.stringify(getUserData), 'Error:', getUserError);
+      Alert.alert(
+        'Error',
+        'Critical user identifier is not available. Please try again or contact support.'
+      );
+      resetMapCardMutation();
+      return;
+    }
+    
+    const privyUserDID = getUserData.data.userId;
+
+    const formattedExpiry = formatExpiryDateForApi(expDate);
+    if (!formattedExpiry) {
+      Alert.alert('Invalid Expiry Date', 'The expiry date format is incorrect. Please use MM/YY.');
+      resetMapCardMutation();
+      return;
+    }
+
+    const variables: MapCardRequestParams = {
+      userId: privyUserDID,
+      status: 'active',
+      expirationDate: formattedExpiry,
+      number: cardNumber.replace(/\s+/g, ''),
+    };
+
+    console.log('[ConfirmationScreen] Variables for mapCard API call:', JSON.stringify(variables));
+
+    mapCardMutateFn(
+      variables,
+      {
+        onSuccess: (data: MappedCardData) => {
+          console.log('Card mapped successfully:', data);
+          router.push({
+            pathname: '/(app)/card-activation/set-pin',
+            params: { cardNumber: `**** **** **** ${cardNumber.slice(-4)}`, expDate, cvv },
+          });
+        },
+        onError: (error: any) => {
+          console.error('Error mapping card:', error);
+          let friendlyMessage = 'There was an issue activating your card. Please check your details and try again.';
+          if (error && typeof error.message === 'string') {
+            if (error.message.includes('You are not authorized')) {
+              friendlyMessage = 'Authorization failed. We couldn\'t verify permissions to map this card. Please try logging out and back in.';
+            } else if (error.message.includes('Customer ID missing')) {
+              friendlyMessage = 'We couldn\'t link the card to your account. Please try again or ensure you are properly logged in.';
+            } else if (error.message.includes('already mapped')) {
+              friendlyMessage = 'This card appears to be already linked to an account.';
+            }
+          }
+          Alert.alert('Card Activation Failed', friendlyMessage + ' If the problem continues, please contact support.');
+        },
+      }
+    );
   };
 
   // Format card number for display (e.g., **** **** **** 1234)
   const formatCardNumber = (number: string) => {
     if (!number) return '';
-
-    // For confirmation screen, show full card number in groups of 4
     const digitsOnly = number.replace(/\s/g, '');
     return digitsOnly.replace(/(\d{4})(?=\d)/g, '$1 ');
   };
+  
+  const overallLoading = isLoadingUser || isMappingCard;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -59,27 +164,24 @@ export default function ConfirmationScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton} disabled={overallLoading}>
           <SvgXml xml={backIconSvg} width={24} height={24} />
         </TouchableOpacity>
         <View style={styles.emptySpace} />
       </View>
 
       <ScrollView style={styles.scrollContent} contentContainerStyle={styles.contentContainer}>
-        {/* New Header Section based on CSS */}
         <View style={styles.confirmationHeaderContainer}>
           <SvgXml xml={cardEditIconSvg} width={32} height={32} />
           <View style={styles.confirmationTextContainer}>
-            <Text style={styles.confirmationTitle}>Confirm your{'\n'}Zerocard details</Text>
+            <Text style={styles.confirmationTitle}>Confirm your\nZerocard details</Text>
             <Text style={styles.confirmationDescription}>
               Let's get started! Activate your Zerocard and enjoy exclusive rewards
             </Text>
           </View>
         </View>
 
-        {/* Card Info Box */}
         <View style={styles.cardContainer}>
-          {/* Card Number Section */}
           <View style={styles.detailSection}>
             <Text style={styles.detailLabel}>Card number</Text>
             <View style={styles.detailValueRow}>
@@ -88,48 +190,54 @@ export default function ConfirmationScreen() {
               </Text>
               <TouchableOpacity
                 onPress={() => handleEditCard('cardNumber')}
-                style={styles.editButton}>
+                style={styles.editButton}
+                disabled={overallLoading}>
                 <Text style={styles.editText}>Edit</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Expiration Date Section */}
           <View style={styles.detailSection}>
             <Text style={styles.detailLabel}>Exp date</Text>
             <View style={styles.detailValueRow}>
               <Text style={styles.detailValue}>{expDate || 'Not available'}</Text>
-              <TouchableOpacity onPress={() => handleEditCard('expDate')} style={styles.editButton}>
+              <TouchableOpacity 
+                onPress={() => handleEditCard('expDate')} 
+                style={styles.editButton}
+                disabled={overallLoading}>
                 <Text style={styles.editText}>Edit</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* CVV Section */}
           <View style={[styles.detailSection, styles.lastDetailSection]}>
             <Text style={styles.detailLabel}>CVV</Text>
             <View style={styles.detailValueRow}>
               <Text style={styles.detailValue}>{cvv || 'Not available'}</Text>
-              <TouchableOpacity onPress={() => handleEditCard('cvv')} style={styles.editButton}>
+              <TouchableOpacity 
+                onPress={() => handleEditCard('cvv')} 
+                style={styles.editButton}
+                disabled={overallLoading}>
                 <Text style={styles.editText}>Edit</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
-
-        {/* Removed old infoText as it's similar to the new header description */}
-        {/* <Text style={styles.infoText}> */}
-        {/*   Please verify your card information before setting up your PIN. */}
-        {/* </Text> */}
       </ScrollView>
 
-      {/* Bottom button */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={[styles.setPinButton, !isDataComplete ? styles.disabledButton : {}]}
+          style={[
+            styles.setPinButton,
+            (!isDataComplete || overallLoading) ? styles.disabledButton : {},
+          ]}
           onPress={handleSetPin}
-          disabled={!isDataComplete}>
-          <Text style={styles.setPinButtonText}>Set Card PIN</Text>
+          disabled={!isDataComplete || overallLoading}>
+          {overallLoading ? (
+            <LoadingSpinner size="small" color="#1F1F1F" />
+          ) : (
+            <Text style={styles.setPinButtonText}>Activate Card</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -256,6 +364,8 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center', // Ensure spinner is centered
+    minHeight: 50, // Ensure button has a minimum height for spinner
   },
   disabledButton: {
     backgroundColor: '#555555', // Darker disabled color for dark theme

@@ -133,14 +133,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F7F7',
     alignItems: 'center',
-    paddingTop: 0,
-    gap: 24,
   },
   mainContent: {
     flex: 1,
     flexDirection: 'column',
     alignItems: 'center',
     alignSelf: 'stretch',
+    paddingTop: 0,
+    paddingBottom: 24,
   },
   imageContainer: {
     justifyContent: 'center',
@@ -238,6 +238,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 1,
+    marginTop: 'auto',
+    marginBottom: 16,
   },
   betaText: {
     fontFamily: 'SF Pro Text',
