@@ -57,9 +57,22 @@ export default function HomeScreen() {
   console.log('[HomeScreen] Rendering');
   const { user, logout } = usePrivy() as any;
   const insets = useSafeAreaInsets();
-  const { cardStage, refetchCreateUserMutation } = useUserContext(); // Get cardStage and refetch function
-  console.log(`[HomeScreen] Rendering. cardStage from context: ${cardStage}`);
-  const [isRefreshing, setIsRefreshing] = useState(false); // Moved declaration up
+  const { cardStage, refetchCreateUserMutation } = useUserContext();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Moved useEffects to the top level, before any conditional returns
+  useEffect(() => {
+    if (user) { 
+      console.log('[HomeScreen] cardStage changed to:', cardStage);
+    }
+  }, [cardStage, user]);
+
+  useEffect(() => {
+    if (user) { 
+      console.log('[HomeScreen] State update - cardStage:', cardStage, '| user:', JSON.stringify(user ? { id: user.id, privyFid: user.privyFid } : null));
+    }
+  }, [cardStage, user]);
+
   const {
     showLimitToast,
     showWithdrawalToast,
@@ -254,22 +267,6 @@ export default function HomeScreen() {
     return <Redirect href="/" />;
   }
 
-  const handleLogout = async () => {
-    try {
-      // Clear any saved state on logout
-      await AsyncStorage.multiRemove([
-        'username',
-        'user_verified',
-        'card_ordered',
-        'identity_type',
-      ]);
-      await logout();
-      // No need for navigation here - the Redirect will handle it
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
   // Handlers for card status actions
   const handleOrderCard = () => {
     // Show the card type selection modal
@@ -371,48 +368,55 @@ export default function HomeScreen() {
   };
 
   // Add a new function to handle direct order card flow navigation
-  const handleSimulateOrderCard = () => {
-    router.push('/card-ordering');
-  };
+  // const handleSimulateOrderCard = () => {
+  //   router.push('/card-ordering');
+  // };
 
   // Add a new function to set the userStage to has_transactions
-  const handleSimulateHasTransactions = () => {
-    console.log('Setting userStage to has_transactions - NO LONGER SETS STATE DIRECTLY');
-    // setUserStage('has_transactions'); // Commented out to prevent ReferenceError
-    // TODO: Re-evaluate how to simulate this state if needed, perhaps by updating cardStage via context or a mutation.
-  };
+  // const handleSimulateHasTransactions = () => {
+  //   console.log('Setting userStage to has_transactions - NO LONGER SETS STATE DIRECTLY');
+  //   // setUserStage('has_transactions'); // Commented out to prevent ReferenceError
+  //   // TODO: Re-evaluate how to simulate this state if needed, perhaps by updating cardStage via context or a mutation.
+  // };
 
   // Add a new function to simulate card activation by refetching user data
-  const handleSimulateCardActivation = async () => {
-    console.log('[HomeScreen] handleSimulateCardActivation called');
-    if (!refetchCreateUserMutation) {
-      console.error('[HomeScreen] refetchCreateUserMutation is not available from useUserContext.');
-      Alert.alert('Error', 'Simulation function is not properly configured.');
-      return;
-    }
+  // const handleSimulateCardActivation = async () => {
+  //   console.log('[HomeScreen] handleSimulateCardActivation called');
+  //   if (!refetchCreateUserMutation) {
+  //     console.error('[HomeScreen] refetchCreateUserMutation is not available from useUserContext.');
+  //     Alert.alert('Error', 'Simulation function is not properly configured.');
+  //     return;
+  //   }
+  //   try {
+  //     console.log('[HomeScreen] Attempting to call refetchCreateUserMutation...');
+  //     const simulationResult = await refetchCreateUserMutation();
+  //     console.log('[HomeScreen] refetchCreateUserMutation call completed. Result:', simulationResult);
+  //     Alert.alert('Simulation Attempted', 'Card activation simulation process has been initiated. Check app state or console for updates.');
+  //   } catch (error) {
+  //     console.error('[HomeScreen] Error during card activation simulation attempt:', error);
+  //     let errorMessage = 'An error occurred while trying to simulate card activation.';
+  //     if (error instanceof Error) {
+  //       errorMessage += ` Details: ${error.message}`;
+  //     }
+  //     Alert.alert('Simulation Error', errorMessage);
+  //   }
+  // };
+
+  const handleLogout = async () => {
     try {
-      console.log('[HomeScreen] Attempting to call refetchCreateUserMutation...');
-      const simulationResult = await refetchCreateUserMutation();
-      console.log('[HomeScreen] refetchCreateUserMutation call completed. Result:', simulationResult);
-      Alert.alert('Simulation Attempted', 'Card activation simulation process has been initiated. Check app state or console for updates.');
+      // Clear any saved state on logout
+      await AsyncStorage.multiRemove([
+        'username',
+        'user_verified',
+        'card_ordered',
+        'identity_type',
+      ]);
+      await logout();
+      // No need for navigation here - the Redirect will handle it
     } catch (error) {
-      console.error('[HomeScreen] Error during card activation simulation attempt:', error);
-      let errorMessage = 'An error occurred while trying to simulate card activation.';
-      if (error instanceof Error) {
-        errorMessage += ` Details: ${error.message}`;
-      }
-      Alert.alert('Simulation Error', errorMessage);
+      console.error('Logout error:', error);
     }
   };
-
-  // Add a useEffect to log cardStage changes for easier debugging
-  useEffect(() => {
-    console.log('[HomeScreen] cardStage changed to:', cardStage);
-  }, [cardStage]);
-
-  useEffect(() => {
-    console.log('[HomeScreen] State update - cardStage:', cardStage, '| cardStatus:', cardStage, '| user:', JSON.stringify(user ? { id: user.id, privyFid: user.privyFid } : null));
-  }, [cardStage, user, cardStage]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -542,7 +546,7 @@ export default function HomeScreen() {
           )}
 
           {/* Simulation Buttons - Placed in a horizontal row */}
-          <View style={styles.simulationContainer}>
+          {/* <View style={styles.simulationContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.simulationButtonsRow}>
               <TouchableOpacity
                 style={styles.simulationButton}
@@ -568,7 +572,6 @@ export default function HomeScreen() {
                 <Text style={styles.simulationButtonText}>Show Transactions</Text>
               </TouchableOpacity>
 
-              {/* New button to simulate crypto deposit */}
               <TouchableOpacity
                 style={[styles.simulationButton, { backgroundColor: '#5433FF' }]}
                 onPress={() => handleNewDeposit({
@@ -586,7 +589,6 @@ export default function HomeScreen() {
                 <Text style={styles.simulationButtonText}>Simulate Deposit</Text>
               </TouchableOpacity>
 
-              {/* New button to simulate card activation */}
               <TouchableOpacity
                 style={[styles.simulationButton, { backgroundColor: '#00C49A' }]}
                 onPress={handleSimulateCardActivation} 
@@ -595,7 +597,7 @@ export default function HomeScreen() {
                 <Text style={styles.simulationButtonText}>Simulate Activation</Text>
               </TouchableOpacity>
             </ScrollView>
-          </View>
+          </View> */}
         </ScrollView>
 
         {/* Username Modal */}

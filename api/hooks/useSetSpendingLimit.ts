@@ -37,7 +37,7 @@ export const useSetSpendingLimit = () => {
     mutationFn: async (variables: SetSpendingLimitVariables) => {
       const { userId, usdAmount, chainType, tokenSymbol } = variables;
       
-      const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'Base Sepolia';
+      const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'Base';
 
       const payload: SetSpendingLimitPayload = {
         usdAmount,

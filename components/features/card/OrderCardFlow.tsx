@@ -8,11 +8,14 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  Clipboard,
+  Alert,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { useFonts } from 'expo-font';
 import { SquircleView } from 'react-native-figma-squircle';
 import QRCode from 'react-native-qrcode-svg';
+import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
 
 // Import close icon SVG
 const closeIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -65,12 +68,21 @@ interface OrderCardFlowProps {
   onGetStarted?: () => void;
 }
 
+// Helper function to format wallet address
+const formatWalletAddress = (address: string | undefined, startChars = 6, endChars = 4): string => {
+  if (!address) return 'Wallet not available';
+  if (address.length <= startChars + endChars + 2) return address; // No need to shorten if already short
+  return `${address.substring(0, startChars)}...${address.substring(address.length - endChars)}`;
+};
+
 const OrderCardFlow: React.FC<OrderCardFlowProps> = ({ onClose, onGetStarted }) => {
   const [isWalletPopupVisible, setIsWalletPopupVisible] = useState(false);
   const popupAnimation = useRef(new Animated.Value(0)).current;
   const [fontsLoaded, fontError] = useFonts({
     'RockSalt-Regular': require('../../../assets/fonts/RockSalt-Regular.ttf'),
   });
+
+  const actualWalletAddress = useUserWalletAddress();
 
   useEffect(() => {
     if (fontError) {
@@ -80,18 +92,16 @@ const OrderCardFlow: React.FC<OrderCardFlowProps> = ({ onClose, onGetStarted }) 
 
   const toggleWalletPopup = () => {
     if (isWalletPopupVisible) {
-      // Hide popup with quick fade out
       Animated.parallel([
         Animated.timing(popupAnimation, {
           toValue: 0,
-          duration: 150, // Faster close animation
+          duration: 150,
           useNativeDriver: true,
         }),
       ]).start(() => {
         setIsWalletPopupVisible(false);
       });
     } else {
-      // Show popup with spring animation
       setIsWalletPopupVisible(true);
       Animated.spring(popupAnimation, {
         toValue: 1,
@@ -101,8 +111,13 @@ const OrderCardFlow: React.FC<OrderCardFlowProps> = ({ onClose, onGetStarted }) 
       }).start();
     }
   };
-
-  const walletAddress = 'Oxf235..6h92F'; // This would come from your wallet API
+  
+  const copyToClipboard = () => {
+    if (actualWalletAddress) {
+      Clipboard.setString(actualWalletAddress);
+      Alert.alert("Copied!", "Wallet address copied to clipboard.");
+    }
+  };
 
   const popupTranslateY = popupAnimation.interpolate({
     inputRange: [0, 1],
@@ -224,17 +239,26 @@ const OrderCardFlow: React.FC<OrderCardFlowProps> = ({ onClose, onGetStarted }) 
                 opacity: popupOpacity,
               },
             ]}>
-            <View style={styles.walletImageContainer}>
-              <QRCode value={walletAddress} size={130} backgroundColor="#ECECEC" color="#000000" />
-            </View>
-
-            <View style={styles.walletAddressContainer}>
-              <Text style={styles.walletAddressText}>{walletAddress}</Text>
-              <View style={styles.walletAddressDivider} />
-              <TouchableOpacity style={styles.copyButton}>
-                <SvgXml xml={copyIconSvg} width={16} height={16} />
-              </TouchableOpacity>
-            </View>
+            {actualWalletAddress ? (
+              <>
+                <View style={styles.walletImageContainer}>
+                  <QRCode value={actualWalletAddress} size={130} backgroundColor="#ECECEC" color="#000000" />
+                </View>
+                <View style={styles.walletAddressContainer}>
+                  <Text style={styles.walletAddressText} numberOfLines={1} ellipsizeMode="tail">
+                    {formatWalletAddress(actualWalletAddress, 6, 4)} 
+                  </Text>
+                  <View style={styles.walletAddressDivider} />
+                  <TouchableOpacity style={styles.copyButton} onPress={copyToClipboard}>
+                    <SvgXml xml={copyIconSvg} width={16} height={16} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.walletImageContainer}> 
+                <Text style={styles.walletAddressText}>Wallet not available</Text>
+              </View>
+            )}
           </Animated.View>
         )}
       </View>
@@ -505,12 +529,6 @@ const styles = StyleSheet.create({
     shadowRadius: 0.5,
     borderRadius: 9,
   },
-  walletImage: {
-    width: 134,
-    height: 135,
-    backgroundColor: '#D9D9D9',
-    borderRadius: 9,
-  },
   walletAddressContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -524,25 +542,24 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   walletAddressText: {
+    flex: 1,
     fontFamily: 'SF Pro Text',
     fontWeight: '500',
     fontSize: 16,
     lineHeight: 17,
-    textAlign: 'center',
-    letterSpacing: 0,
     color: '#696969',
+    overflow: 'hidden',
   },
   copyButton: {
-    width: 16,
-    height: 16,
+    padding: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
   walletAddressDivider: {
     width: 1,
-    height: 17,
-    borderWidth: 0.5,
-    borderColor: '#A0A0A0',
+    height: '100%',
+    backgroundColor: '#A0A0A0',
+    marginHorizontal: 4,
   },
 });
 

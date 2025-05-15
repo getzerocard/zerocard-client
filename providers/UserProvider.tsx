@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserWallets } from '../common/hooks/useUserWalletAddress';
 import { useDelegationStore } from '../store/delegationStore';
 import { useCreateUser } from '../api/hooks/createUser';
-import { useRouter } from 'expo-router';
+import { useRouter, Slot } from 'expo-router'; 
 import { UserApiResponse } from '../api/hooks/useGetUser';
 
 export type UserCardStage = 'not_ordered' | 'pending_activation' | 'activated' | 'unknown';

@@ -101,7 +101,7 @@ const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelec
     onSelectCardType('physical');
     onClose();
     // Navigate to the correct card ordering page
-    router.push('/card-ordering');
+    router.push('/(app)/card-ordering');
   };
 
   // Return null on Android

@@ -94,7 +94,7 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
 
   const initiateKycMutation = useInitiateKycVerification();
   const validateOtpMutation = useValidateKycOtp();
-  const { kycDetails, setKycVerificationDetails, shippingAddress } = useOrderCardStore();
+  const { kycDetails, setKycVerificationDetails, shippingAddress, clearKycVerificationDetails } = useOrderCardStore();
   const { user: privyUser } = usePrivy();
   const updateUserMutation = useUpdateUser();
   const orderCardMutation = useOrderCard();
@@ -112,9 +112,10 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
       const apiIdentityType = selectedIdentity === 'NIN' ? 'NIN' : 'BVN';
       
       // Log the data being sent
-      // console.log('Initiating KYC verification with:', { identityType: apiIdentityType, number: identityNumber }); 
+      const initiatePayload = { identityType: apiIdentityType, number: identityNumber };
+      console.log('[IdentityVerification] Initiating KYC verification with:', JSON.stringify(initiatePayload, null, 2)); 
       initiateKycMutation.mutate(
-        { identityType: apiIdentityType, number: identityNumber },
+        initiatePayload,
         {
           onSuccess: (data) => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -148,13 +149,15 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
       // Determine the short identity type for the API call
       const apiIdentityType = selectedIdentity === 'NIN' ? 'NIN' : 'BVN';
 
+      const validateOtpPayload = {
+        identityType: apiIdentityType, // Use the short form
+        otp: otpCode,
+        storedVerificationId: kycDetails.verificationId, 
+        storedIdentityNumber: kycDetails.verificationNumber, 
+      };
+      console.log('[IdentityVerification] Validating OTP with:', JSON.stringify(validateOtpPayload, null, 2));
       validateOtpMutation.mutate(
-        {
-          identityType: apiIdentityType, // Use the short form
-          otp: otpCode,
-          storedVerificationId: kycDetails.verificationId, 
-          storedIdentityNumber: kycDetails.verificationNumber, 
-        },
+        validateOtpPayload,
         {
           onSuccess: (data) => {
             if (data.verified && data.status === 'SUCCESS') {
@@ -181,11 +184,11 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
               setOtpInputError(error.message);
             } else if (error.message === "Record not found") {
               setOtpInputError(error.message);
-        } else {
+            } else {
               // Default to "Service unavailable" for all other errors (including 5xx or unknown)
               setOtpInputError("Service unavailable");
             }
-
+            clearKycVerificationDetails(); // Clear stored KYC details on OTP error
             shakeField(otpShakeAnimation);
             setOtpVerified(false);
           },
@@ -214,6 +217,7 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
     setIsSubmittingOrder(false);
     initiateKycMutation.reset();
     validateOtpMutation.reset();
+    clearKycVerificationDetails(); // Clear stored KYC details when resetting state
   };
 
   const shakeField = (animation: Animated.Value) => {

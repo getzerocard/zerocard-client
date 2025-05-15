@@ -116,7 +116,7 @@ const CardModule: React.FC<CardModuleProps> = ({
   const isAddressLoading = !walletAddress;
 
   // Use the balance hook
-  const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'Base Sepolia';
+  const blockchainNetwork = process.env.EXPO_PUBLIC_BLOCKCHAIN_NETWORK || 'Base';
   console.log('[CardModule] Using blockchain network:', blockchainNetwork);
 
   const {

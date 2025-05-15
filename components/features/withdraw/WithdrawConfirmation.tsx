@@ -61,7 +61,7 @@ export default function WithdrawConfirmation() {
   }>();
 //TODO: Chnage to Base on Prod
   // Hardcode blockchainNetwork
-  const blockchainNetwork = 'Base Sepolia';
+  const blockchainNetwork = 'Base';
 
   // Use the withdrawal mutation hook
   const {

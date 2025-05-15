@@ -127,8 +127,7 @@ export default function ConfirmationScreen() {
         onSuccess: (data: MappedCardData) => {
           console.log('Card mapped successfully:', data);
           router.push({
-            pathname: '/(app)/card-activation/set-pin',
-            params: { cardNumber: `**** **** **** ${cardNumber.slice(-4)}`, expDate, cvv },
+            pathname: '/(app)/card-activation/activated',
           });
         },
         onError: (error: any) => {

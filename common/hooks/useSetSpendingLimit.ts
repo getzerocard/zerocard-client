@@ -22,7 +22,7 @@ export function useSetSpendingLimit() {
       try {
         console.log('Attempting to set spending limit with params:', params);
         // TODO: Remove the hardcoded value for blockchainNetworkValue
-        const blockchainNetworkValue = 'Base Sepolia'; // Using the hardcoded value
+        const blockchainNetworkValue = 'Base'; // Using the hardcoded value
         const queryParams = `usdAmount=${params.usdAmount}&chainType=${params.chainType}&tokenSymbol=${params.tokenSymbol}&blockchainNetwork=${encodeURIComponent(blockchainNetworkValue)}`;
         const endpoint = `/spending-limits/set-limit/me?${queryParams}`;
         
