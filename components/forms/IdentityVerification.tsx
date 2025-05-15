@@ -25,6 +25,7 @@ import { useValidateKycOtp } from '../../api/hooks/useValidateKycOtp';
 import { usePrivy } from '@privy-io/expo';
 import { useUpdateUser } from '../../api/hooks/useUpdateUser';
 import { useOrderCard } from '../../api/hooks/useOrderCard';
+import { useUserContext } from '../../providers/UserProvider';
 
 // Define the source of truth for identity types
 const IDENTITY_TYPES = [
@@ -97,6 +98,7 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
   const { user: privyUser } = usePrivy();
   const updateUserMutation = useUpdateUser();
   const orderCardMutation = useOrderCard();
+  const { refetchCreateUserMutation } = useUserContext();
 
   // Helper function to get display label from ID
   const getDisplayLabel = (id: string): string => {
@@ -410,7 +412,7 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
             city: shippingAddress.city,
             state: shippingAddress.state,
             postalCode: shippingAddress.postalCode,
-            country: 'USA', // Assuming USA as default, adjust if needed
+            country: shippingAddress.country, // Use the country from the store
           }
         };
 
@@ -431,6 +433,9 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
 
       console.log('User update and card order successful!');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      console.log('[IdentityVerification] Triggering refetchCreateUserMutation after card order.');
+      refetchCreateUserMutation();
 
       // Navigate on success of BOTH calls
       router.push('/(app)/card-ordering/order-confirmation');

@@ -55,6 +55,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     setIsMounted(true);
   }, []);
 
+  console.log(`[UserProvider] Rendering. cardStage state: ${cardStage}, isNewUserState: ${isNewUserState}`);
+
   const refetchCreateUserMutation = React.useCallback(() => { // Memoize if passing down often, good practice
     setHasNavigated(false); // Reset navigation lock to allow navigation after refetch
     setRefreshUserTrigger(prev => prev + 1);
@@ -77,6 +79,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         
         actualCreateUserMutate(undefined, {
           onSuccess: async (userData: any) => {
+            console.log('[UserProvider] actualCreateUserMutate.onSuccess: Received userData:', JSON.stringify(userData, null, 2));
             console.log('[UserProvider] createUser/fetchUser onSuccess. Raw API userData:', JSON.stringify(userData, null, 2));
 
             const apiIsNewUser = userData?.isNewUser === true;
@@ -109,6 +112,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
               derivedCardStage = 'not_ordered'; 
               console.log('[UserProvider] cardOrderStatus missing in API response, defaulting to not_ordered.');
             }
+            console.log(`[UserProvider] About to setCardStage. Current state: ${cardStage}, Derived from userData: ${derivedCardStage}`);
             setCardStage(derivedCardStage);
             console.log(`[UserProvider] Derived cardStage: ${derivedCardStage} from API status: ${apiCardOrderStatus}`);
 

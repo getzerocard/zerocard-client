@@ -55,6 +55,7 @@ export const useCreateUser = () => {
       const response = await apiService.post('/users/me', {}); 
       const responseData = await response.json();
       if (responseData.success && responseData.data) {
+        console.log('[useCreateUser - mutationFn] Fresh data from POST /users/me:', JSON.stringify(responseData.data, null, 2));
         // Assuming responseData.data is now UserProfileResponse
         return responseData.data as UserProfileResponse; 
       } else {

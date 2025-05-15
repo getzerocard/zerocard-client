@@ -43,10 +43,9 @@ export const useUpdateUser = () => {
     mutationFn: async (variables: UpdateUserVariables) => {
       const { payload } = variables;
       // Changed endpoint to /users/me
-      const response = await apiService.post(
+      const response = await apiService.patch(
         `/users/me`,
         payload,
-        { method: 'PATCH' }
       );
       const jsonResponse: ApiResponse<UpdateUserData> = await response.json();
 

@@ -57,6 +57,7 @@ export default function HomeScreen() {
   const { user, logout } = usePrivy() as any;
   const insets = useSafeAreaInsets();
   const { cardStage, refetchCreateUserMutation } = useUserContext(); // Get cardStage and refetch function
+  console.log(`[HomeScreen] Rendering. cardStage from context: ${cardStage}`);
   const [isRefreshing, setIsRefreshing] = useState(false); // Moved declaration up
   const {
     showLimitToast,

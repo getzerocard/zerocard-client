@@ -7,6 +7,7 @@ export interface OrderAddressDetails {
   city: string | undefined;
   state: string | undefined;
   postalCode: string | undefined;
+  country: string | undefined;
 }
 
 interface KycVerificationDetails {
