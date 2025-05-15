@@ -57,6 +57,7 @@ interface CardTypeModalProps {
 }
 
 const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelectCardType }) => {
+  console.log('CARDTYPEMODAL: COMPONENT RENDERED/PROPS CHANGED, VISIBLE:', visible);
   // Animation values
   const opacity = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(100)).current;
@@ -65,6 +66,7 @@ const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelec
   // Handle animations when visibility changes
   React.useEffect(() => {
     if (visible) {
+      console.log('CARDTYPEMODAL: MODAL WILL BECOME VISIBLE');
       Animated.parallel([
         Animated.timing(opacity, {
           toValue: 1,
@@ -80,6 +82,7 @@ const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelec
         }),
       ]).start();
     } else {
+      console.log('CARDTYPEMODAL: MODAL WILL BECOME HIDDEN');
       Animated.parallel([
         Animated.timing(opacity, {
           toValue: 0,
@@ -98,6 +101,7 @@ const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelec
   }, [visible, opacity, translateY]);
 
   const handleSelectPhysicalCard = () => {
+    console.log('CARDTYPEMODAL: PHYSICAL CARD SELECTED');
     onSelectCardType('physical');
     onClose();
     // Navigate to the correct card ordering page
@@ -106,14 +110,15 @@ const CardTypeModal: React.FC<CardTypeModalProps> = ({ visible, onClose, onSelec
 
   // Return null on Android
   if (Platform.OS === 'android') {
+    console.log('CARDTYPEMODAL: RENDERING NULL (ANDROID)');
     return null;
   }
 
   return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
+    <Modal transparent visible={visible} animationType="none" onRequestClose={() => { console.log('CARDTYPEMODAL: MODAL CLOSE REQUESTED (HARDWARE BACK/ESCAPE)'); onClose(); }}>
       <BlurBackground visible={visible} intensity={40} tint="dark" />
 
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { console.log('CARDTYPEMODAL: OVERLAY PRESSED, CLOSING MODAL'); onClose(); }}>
         <Animated.View
           style={[
             styles.modalAnimatedContainer,

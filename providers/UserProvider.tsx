@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserWallets } from '../common/hooks/useUserWalletAddress';
 import { useDelegationStore } from '../store/delegationStore';
 import { useCreateUser } from '../api/hooks/createUser';
-import { useRouter, Slot } from 'expo-router'; 
+import { useRouter, Slot, usePathname } from 'expo-router';
 import { UserApiResponse } from '../api/hooks/useGetUser';
 
 export type UserCardStage = 'not_ordered' | 'pending_activation' | 'activated' | 'unknown';
@@ -39,6 +39,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [cardStage, setCardStage] = useState<UserCardStage>('unknown'); // New state for card stage
   const { mutate: actualCreateUserMutate, ...createUserRest } = useCreateUser();
   const router = useRouter();
+  const pathname = usePathname(); // Get current pathname
 
   // Refs to track processed user and trigger
   const lastProcessedUserIdRef = React.useRef<string | null>(null);
@@ -158,23 +159,60 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
 
             if (isMounted && !hasNavigated) {
               setTimeout(() => {
+                const currentPath = pathname; // Use pathname from usePathname()
+                console.log(`[UserProvider] Current path before navigation decision: ${currentPath}`);
+
                 if (apiIsNewUser && finalUsernameIsMissing) {
                   // Scenario 1: API new user AND effective username is missing.
-                  console.log('[UserProvider] Scenario 1: API new user AND username missing. Navigating to /post-auth. Modal should appear there.');
-                  router.replace('/(app)/post-auth');
+                  console.log('[UserProvider] Scenario 1: API new user AND username missing. Navigating to /post-auth.');
+                  if (currentPath !== '/(app)/post-auth' && currentPath !== '/post-auth') { // Check both with and without group
+                    router.replace('/(app)/post-auth');
+                  }
                   setHasNavigated(true);
                 } else if (!apiIsNewUser && finalUsernameIsMissing) {
                   // Scenario 2: API existing user BUT effective username is missing.
-                  console.log('[UserProvider] Scenario 2: API existing user BUT username missing. Navigating to /home. Modal should appear there.');
-                  router.replace('/(tab)/home');
-                  setHasNavigated(true);
+                  console.log('[UserProvider] Scenario 2: API existing user BUT username missing. Considering navigation to /home.');
+                  // Check if currentPath is one of the card ordering flow paths (without group prefix if pathname provides it that way)
+                  const isCardOrderingFlow = [
+                    '/card-ordering', 
+                    '/(app)/card-ordering',
+                    '/shipping-address', 
+                    '/(app)/shipping-address',
+                    '/identity-verification', 
+                    '/(app)/identity-verification',
+                    '/order-confirmation', 
+                    '/(app)/order-confirmation'
+                  ].includes(currentPath);
+
+                  if (!isCardOrderingFlow && currentPath !== '/(tab)/home' && currentPath !== '/home') {
+                    router.replace('/(tab)/home');
+                    console.log('[UserProvider] Scenario 2: Navigated to /home.');
+                  } else {
+                    console.log('[UserProvider] Scenario 2: Skipping navigation to /home, current path is:', currentPath);
+                  }
+                  setHasNavigated(true); // Mark navigation attempt as handled
                 } else if (!finalUsernameIsMissing) {
-                  // Scenario 3: Effective username is present (covers both new and existing API users).
-                  console.log('[UserProvider] Scenario 3: Username exists. Navigating to /home.');
-                  router.replace('/(tab)/home');
-                  setHasNavigated(true);
+                  // Scenario 3: Effective username is present.
+                  console.log('[UserProvider] Scenario 3: Username exists. Considering navigation to /home.');
+                  // Check if currentPath is one of the card ordering flow paths or other (app) routes
+                  const isAppOrCardOrderingFlow = currentPath.startsWith('/(app)/') || 
+                                                currentPath.startsWith('/app/') || // Fallback for potential normalization
+                                                [
+                                                  '/card-ordering', 
+                                                  '/shipping-address', 
+                                                  '/identity-verification', 
+                                                  '/order-confirmation'
+                                                  // Add other specific non-grouped /app/ paths here if necessary
+                                                ].includes(currentPath);
+
+                  if (!isAppOrCardOrderingFlow && currentPath !== '/(tab)/home' && currentPath !== '/home') {
+                    router.replace('/(tab)/home');
+                    console.log('[UserProvider] Scenario 3: Navigated to /home.');
+                  } else {
+                    console.log('[UserProvider] Scenario 3: Skipping navigation to /home, current path is:', currentPath);
+                  }
+                  setHasNavigated(true); // Mark navigation attempt as handled
                 }
-                // No explicit 'else' as the three conditions should cover intended logic.
               }, 100);
             }
           },
@@ -236,7 +274,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     updateIsNewUserState, 
     setIsLoadingUserCreation, 
     setIsReady,
-    setCardStage
+    setCardStage,
+    pathname
   ]);
 
   // Delegate wallets after user logs in

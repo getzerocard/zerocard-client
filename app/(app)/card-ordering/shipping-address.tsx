@@ -4,19 +4,23 @@ import { router, useLocalSearchParams } from 'expo-router';
 import ShippingAddress from '../../../components/forms/ShippingAddress';
 
 export default function ShippingAddressScreen() {
+  console.log('SHIPPINGADDRESSSCREEN: RENDERING');
   const isAndroid = Platform.OS === 'android';
   const params = useLocalSearchParams();
   const identity = params.identity as string;
 
   const handleClose = () => {
+    console.log('SHIPPINGADDRESSSCREEN: HANDLE CLOSE CALLED');
     router.back();
   };
 
   const handleBack = () => {
+    console.log('SHIPPINGADDRESSSCREEN: HANDLE BACK CALLED');
     router.back();
   };
 
   const handleContinue = (addressData: any) => {
+    console.log('SHIPPINGADDRESSSCREEN: HANDLE CONTINUE CALLED, ADDRESSDATA:', JSON.stringify(addressData));
     // Use absolute path instead of relative path for more reliable navigation
     router.push('/(app)/card-ordering/identity-verification');
   };

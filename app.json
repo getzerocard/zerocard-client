@@ -39,10 +39,10 @@
       "tsconfigPaths": true
     },
     "orientation": "portrait",
-    "icon": "./assets/base-logo-in-blue.png",
+    "icon": "./assets/images/card-wallet/splash-logo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/images/card-wallet/splash-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#f7f7f7"
     },
@@ -63,7 +63,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/base-logo-in-blue.png",
+        "foregroundImage": "./assets/images/card-wallet/splash-logo.png",
         "backgroundColor": "#ffffff"
       },
       "newArchEnabled": true,

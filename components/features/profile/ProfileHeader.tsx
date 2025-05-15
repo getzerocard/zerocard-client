@@ -38,19 +38,26 @@ interface ProfileHeaderProps {
    * Callback when wallet address is copied
    */
   onWalletAddressCopy?: () => void;
+
+  /**
+   * Indicates if the username is currently being loaded.
+   * @default false
+   */
+  isUsernameLoading?: boolean;
 }
 
 const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   username,
   onEditProfileImage,
-  onWalletAddressCopy
+  onWalletAddressCopy,
+  isUsernameLoading = false,
 }) => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const displayUsername = username || 'User';
   
   // Use our wallet address hook to get the real wallet address
   const walletAddress = useUserWalletAddress();
-  const isLoading = !walletAddress;
+  const isWalletLoading = !walletAddress;
   
   // Format wallet address to show first and last characters
   const formattedWalletAddress = React.useMemo(() => {
@@ -125,15 +132,19 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       </View>
 
       {/* Username */}
-      <Text style={styles.username}>{displayUsername}</Text>
+      {isUsernameLoading ? (
+        <SkeletonLoader width={150} height={19} borderRadius={4} style={styles.skeletonUsername} />
+      ) : (
+        <Text style={styles.username}>{displayUsername}</Text>
+      )}
 
       {/* Wallet address with copy button */}
       <TouchableOpacity 
         style={styles.walletContainer} 
         onPress={copyToClipboard}
-        disabled={isLoading}
+        disabled={isWalletLoading}
       >
-        {isLoading ? (
+        {isWalletLoading ? (
           <SkeletonLoader 
             width={100} 
             height={17} 
@@ -209,6 +220,9 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: 'center',
     color: '#121212',
+    marginVertical: 2,
+  },
+  skeletonUsername: {
     marginVertical: 2,
   },
   walletContainer: {

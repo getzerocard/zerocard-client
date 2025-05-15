@@ -5,12 +5,14 @@ import * as Localization from 'expo-localization';
 
 import { useUserWalletAddress } from '../../../common/hooks/useUserWalletAddress';
 import { Web3Avatar } from '../../ui/Avatar';
+import { SkeletonLoader } from '../../ui/feedback/SkeletonLoader';
 
 interface GreetingHeaderProps {
   username: string;
   profileImage?: ImageSourcePropType;
   initial?: string;
   onProfilePress?: () => void;
+  isLoading?: boolean;
 }
 
 export default function GreetingHeader({
@@ -18,6 +20,7 @@ export default function GreetingHeader({
   profileImage,
   initial = 'U',
   onProfilePress,
+  isLoading = false,
 }: GreetingHeaderProps) {
   // Get real wallet address using our hook
   const walletAddress = useUserWalletAddress();
@@ -84,7 +87,11 @@ export default function GreetingHeader({
 
       <View style={styles.textContainer}>
         <Text style={styles.greetingText}>{getGreeting()},</Text>
-        <Text style={styles.usernameText}>{username}</Text>
+        {isLoading ? (
+          <SkeletonLoader width={120} height={19} borderRadius={4} style={styles.skeletonUsername} />
+        ) : (
+          <Text style={styles.usernameText}>{username}</Text>
+        )}
       </View>
     </View>
   );
@@ -138,5 +145,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 19.2,
     color: '#000',
+  },
+  skeletonUsername: {
+    marginTop: 2,
   },
 });

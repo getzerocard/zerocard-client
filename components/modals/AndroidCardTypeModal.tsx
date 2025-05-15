@@ -134,7 +134,7 @@ const AndroidCardTypeModal: React.FC<AndroidCardTypeModalProps> = ({
                     onSelectCardType('physical');
                     onClose();
                     // For Android, navigate to order-card as a modal
-                    router.push('/(tab)/home/order-card');
+                    router.push({ pathname: '/(tab)/home/order-card' as any });
                   }}>
                   <SvgXml xml={physicalCardSvg} width={36} height={36} />
                   <View style={styles.cardOptionContent}>

@@ -5,14 +5,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import OrderCardFlow from '../../../components/features/card/OrderCardFlow';
 
 export default function OrderCardPage() {
+  console.log('ORDERCARDPAGE: RENDERING');
   const params = useLocalSearchParams();
   const isAndroid = Platform.OS === 'android';
 
   const handleClose = () => {
+    console.log('ORDERCARDPAGE: HANDLE CLOSE CALLED');
     router.back();
   };
 
   const handleGetStarted = () => {
+    console.log('ORDERCARDPAGE: HANDLE GET STARTED CALLED');
     // Use absolute path instead of relative path for more reliable navigation
     router.push('/(app)/card-ordering/shipping-address');
   };
