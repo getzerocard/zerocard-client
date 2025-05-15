@@ -155,29 +155,47 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
   const { suggestions, selectedAddress, setSuggestions, setSelectedAddress, clearSuggestions } = useAddressStore();
   const updateUserMutation = useUpdateUser();
 
+  // Get the shipping address from the Zustand store
+  const storeShippingAddress = useOrderCardStore((state) => state.shippingAddress);
+
   const streetRef = useRef<TextInput>(null);
   const cityRef = useRef<TextInput>(null);
   const postalCodeRef = useRef<TextInput>(null);
 
-  // Load saved draft on initial mount
+  // Load saved draft or store data on initial mount
   useEffect(() => {
-    const loadDraft = async () => {
-      try {
-        const savedDraft = await AsyncStorage.getItem(ADDRESS_DRAFT_KEY);
-        if (savedDraft) {
-          const draftData = JSON.parse(savedDraft);
-          setStreet(draftData.street || '');
-          setCity(draftData.city || '');
-          setState(draftData.state || '');
-          setPostalCode(draftData.postalCode || '');
+    const loadData = async () => {
+      let loadedFromStore = false;
+      if (storeShippingAddress && storeShippingAddress.street) { // Check if store data is substantial
+        setStreet(storeShippingAddress.street || '');
+        setCity(storeShippingAddress.city || '');
+        setState(storeShippingAddress.state || '');
+        setPostalCode(storeShippingAddress.postalCode || '');
+        // We don't set country here as the form doesn't have a dedicated field for it,
+        // but it's available in storeShippingAddress.country if needed elsewhere.
+        loadedFromStore = true;
+        console.log('[ShippingAddress] Loaded data from orderCardStore:', storeShippingAddress);
+      }
+
+      if (!loadedFromStore) {
+        try {
+          const savedDraft = await AsyncStorage.getItem(ADDRESS_DRAFT_KEY);
+          if (savedDraft) {
+            const draftData = JSON.parse(savedDraft);
+            setStreet(draftData.street || '');
+            setCity(draftData.city || '');
+            setState(draftData.state || '');
+            setPostalCode(draftData.postalCode || '');
+            console.log('[ShippingAddress] Loaded data from AsyncStorage draft:', draftData);
+          }
+        } catch (error) {
+          console.error('Error loading draft from AsyncStorage:', error);
         }
-      } catch (error) {
-        console.error('Error loading draft:', error);
       }
     };
 
-    loadDraft();
-  }, []);
+    loadData();
+  }, [storeShippingAddress]); // Add storeShippingAddress to dependency array
 
   // Autocomplete API call
   useEffect(() => {
@@ -258,6 +276,7 @@ const ShippingAddress: React.FC<ShippingAddressProps> = ({
       city: currentAddressData.city,
       state: currentAddressData.state,
       postalCode: currentAddressData.postalCode,
+      country: currentAddressData.country,
     };
     setShippingAddress(orderAddressDetails);
     console.log('[ShippingAddress] Address saved to orderCardStore:', orderAddressDetails);

@@ -437,6 +437,12 @@ const IdentityVerification: React.FC<Omit<IdentityVerificationProps, 'onVerify'>
       console.log('[IdentityVerification] Triggering refetchCreateUserMutation after card order.');
       refetchCreateUserMutation();
 
+      // Clear orderCardStore after successful order and before navigation
+      const { clearShippingAddress, clearKycVerificationDetails } = useOrderCardStore.getState();
+      clearShippingAddress();
+      clearKycVerificationDetails();
+      console.log('[IdentityVerification] Cleared shippingAddress and kycDetails from orderCardStore.');
+
       // Navigate on success of BOTH calls
       router.push('/(app)/card-ordering/order-confirmation');
 
