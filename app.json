@@ -61,7 +61,7 @@
       "supportsTablet": true,
       "newArchEnabled": true,
       "usesAppleSignIn": true,
-      "buildNumber": "1.1",
+      "buildNumber": "1.2",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
