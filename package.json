@@ -28,6 +28,8 @@
     "@privy-io/public-api": "^2.20.5",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/datetimepicker": "8.2.0",
+    "@react-native-firebase/app": "^22.2.0",
+    "@react-native-firebase/crashlytics": "^22.2.0",
     "@react-navigation/native": "^7.0.3",
     "@shopify/react-native-skia": "1.5.0",
     "@supabase/supabase-js": "^2.38.4",
