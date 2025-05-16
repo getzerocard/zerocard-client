@@ -14,8 +14,7 @@
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write",
     "web": "expo start --web",
-    "postinstall": "patch-package",
-    "eas-build-pre-install": "./scripts/eas-pre-build.sh"
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@coinbase/onchainkit": "^0.38.9",
