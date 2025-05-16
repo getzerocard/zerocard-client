@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-detect-screenshot/android/build.gradle b/node_modules/react-native-detect-screenshot/android/build.gradle
+index 9574561..a244d25 100644
+--- a/node_modules/react-native-detect-screenshot/android/build.gradle
++++ b/node_modules/react-native-detect-screenshot/android/build.gradle
+@@ -24,6 +24,6 @@ android {
+ }
+ 
+ dependencies {
+-    compile fileTree(dir: 'libs', include: ['*.jar'])
+-    compile 'com.facebook.react:react-native:+'
++    implementation fileTree(dir: 'libs', include: ['*.jar'])
++    implementation 'com.facebook.react:react-native:+'
+ }

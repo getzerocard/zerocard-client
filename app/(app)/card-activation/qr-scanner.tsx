@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { SvgXml } from 'react-native-svg';
-import { BarCodeScanner } from 'expo-barcode-scanner';
 import { Ionicons } from '@expo/vector-icons';
 import { backIconQrSvg } from '../../../constants/icons';
 
