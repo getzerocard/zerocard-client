@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 3.17.0"
+    "version": ">= 5.2.0"
   },
   "build": {
     "development": {
@@ -10,13 +10,31 @@
         "gradleCommand": ":app:assembleDebug"
       },
       "ios": {
-        "buildConfiguration": "Debug"
+        "buildConfiguration": "Debug",
+        "resourceClass": "m-medium"
+      },
+      "hooks": {
+        "preBuild": "./.eas/hooks/pre-build.sh"
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium"
+      },
+      "hooks": {
+        "preBuild": "./.eas/hooks/pre-build.sh"
+      }
     },
-    "production": {}
+    "production": {
+      "ios": {
+        "resourceClass": "m-medium"
+      },
+      "hooks": {
+        "preInstall": "npm run eas-build-pre-install",
+        "preBuild": "./.eas/hooks/pre-build.sh"
+      }
+    }
   },
   "submit": {
     "production": {}
