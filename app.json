@@ -57,8 +57,9 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "newArchEnabled": false,
+      "newArchEnabled": true,
       "usesAppleSignIn": true,
+      "buildNumber": "1.1",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -72,7 +73,7 @@
         "foregroundImage": "./assets/images/card-wallet/splash-logo.png",
         "backgroundColor": "#ffffff"
       },
-      "newArchEnabled": false,
+      "newArchEnabled": true,
       "package": "com.zerocard.zerocard",
       "permissions": [
         "android.permission.CAMERA"
