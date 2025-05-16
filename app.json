@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "zerocard",
+    "name": "Zerocard",
     "slug": "zerocard",
     "version": "1.0.0",
     "scheme": "zerocard",
@@ -9,7 +9,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/your-project-id",
+      "url": "https://u.expo.dev/95e69556-dbf1-4c9c-9e13-cc8b86076f5d",
       "enabled": true,
       "fallbackToCacheTimeout": 0
     },
@@ -51,7 +51,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "newArchEnabled": true,
+      "newArchEnabled": false,
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -66,7 +66,7 @@
         "foregroundImage": "./assets/images/card-wallet/splash-logo.png",
         "backgroundColor": "#ffffff"
       },
-      "newArchEnabled": true,
+      "newArchEnabled": false,
       "package": "com.zerocard.zerocard",
       "permissions": [
         "android.permission.CAMERA"
