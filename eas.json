@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 5.2.0"
+    "version": ">= 3.17.0"
   },
   "build": {
     "development": {
@@ -11,39 +11,25 @@
       },
       "ios": {
         "buildConfiguration": "Debug",
-        "resourceClass": "m-medium",
-        "hooks": {
-          "preBuild": {
-            "command": "./.eas/hooks/pre-build.sh",
-            "platforms": ["ios"]
-          }
-        }
-      }
+        "resourceClass": "m-medium"
+      },
+      "env": {}
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+   
+      },
       "ios": {
-        "resourceClass": "m-medium",
-        "hooks": {
-          "preBuild": {
-            "command": "./.eas/hooks/pre-build.sh",
-            "platforms": ["ios"]
-          }
-        }
+        "resourceClass": "m-medium"
       }
     },
     "production": {
+      "env": {
+    
+      },
       "ios": {
-        "resourceClass": "m-medium",
-        "hooks": {
-          "preBuild": {
-            "command": "./.eas/hooks/pre-build.sh",
-            "platforms": ["ios"]
-          },
-          "preInstall": {
-            "command": "npm run eas-build-pre-install"
-          }
-        }
+        "resourceClass": "m-medium"
       }
     }
   },
