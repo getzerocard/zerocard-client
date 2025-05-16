@@ -17,6 +17,8 @@ expo-env.d.ts
 
 ios
 android
+!ios/GoogleService-Info.plist
+!android/app/google-services.json
 
 # macOS
 .DS_Store
