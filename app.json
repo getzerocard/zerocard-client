@@ -38,7 +38,15 @@
         }
       ],
       "expo-font",
-      "expo-localization"
+      "expo-localization",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "zerocard",
+          "project": "react-native",
+          "url": "https://sentry.io/"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -52,9 +60,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#f7f7f7"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "newArchEnabled": true,
@@ -75,9 +81,7 @@
       },
       "newArchEnabled": true,
       "package": "com.zerocard.zerocard",
-      "permissions": [
-        "android.permission.CAMERA"
-      ]
+      "permissions": ["android.permission.CAMERA"]
     },
     "extra": {
       "router": {
