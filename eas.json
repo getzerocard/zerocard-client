@@ -13,7 +13,10 @@
         "buildConfiguration": "Debug",
         "resourceClass": "m-medium",
         "hooks": {
-          "preBuild": "./.eas/hooks/pre-build.sh"
+          "preBuild": {
+            "command": "./.eas/hooks/pre-build.sh",
+            "platforms": ["ios"]
+          }
         }
       }
     },
@@ -22,7 +25,10 @@
       "ios": {
         "resourceClass": "m-medium",
         "hooks": {
-          "preBuild": "./.eas/hooks/pre-build.sh"
+          "preBuild": {
+            "command": "./.eas/hooks/pre-build.sh",
+            "platforms": ["ios"]
+          }
         }
       }
     },
@@ -30,11 +36,14 @@
       "ios": {
         "resourceClass": "m-medium",
         "hooks": {
-          "preBuild": "./.eas/hooks/pre-build.sh"
+          "preBuild": {
+            "command": "./.eas/hooks/pre-build.sh",
+            "platforms": ["ios"]
+          },
+          "preInstall": {
+            "command": "npm run eas-build-pre-install"
+          }
         }
-      },
-      "hooks": {
-        "preInstall": "npm run eas-build-pre-install"
       }
     }
   },
