@@ -11,28 +11,30 @@
       },
       "ios": {
         "buildConfiguration": "Debug",
-        "resourceClass": "m-medium"
-      },
-      "hooks": {
-        "preBuild": "./.eas/hooks/pre-build.sh"
+        "resourceClass": "m-medium",
+        "hooks": {
+          "preBuild": "./.eas/hooks/pre-build.sh"
+        }
       }
     },
     "preview": {
       "distribution": "internal",
       "ios": {
-        "resourceClass": "m-medium"
-      },
-      "hooks": {
-        "preBuild": "./.eas/hooks/pre-build.sh"
+        "resourceClass": "m-medium",
+        "hooks": {
+          "preBuild": "./.eas/hooks/pre-build.sh"
+        }
       }
     },
     "production": {
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium",
+        "hooks": {
+          "preBuild": "./.eas/hooks/pre-build.sh"
+        }
       },
       "hooks": {
-        "preInstall": "npm run eas-build-pre-install",
-        "preBuild": "./.eas/hooks/pre-build.sh"
+        "preInstall": "npm run eas-build-pre-install"
       }
     }
   },
